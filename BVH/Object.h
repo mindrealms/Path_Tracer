@@ -38,9 +38,9 @@ struct Object {
         this->inverseNormalTransform = transform.linear().inverse().transpose();
     }
 
-    Eigen::Affine3f transform;
+    Eigen::Affine3f transform; //obj to world
     Eigen::Affine3f normalTransform;
-    Eigen::Affine3f inverseTransform;
+    Eigen::Affine3f inverseTransform; //world to obj
     Eigen::Affine3f inverseNormalTransform;
 };
 

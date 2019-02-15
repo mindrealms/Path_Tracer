@@ -5,6 +5,17 @@
 
 #include "scene/scene.h"
 
+#define N_SAMPLES 1.f       //N number of samples per pixel
+#define START_P 0.2f          //initial (stop) probability (for the first 5 bounces)
+
+using namespace Eigen;
+
+enum MODE {
+    INVALID = -1,
+    DIFFUSE,
+    GLOSSY,
+    MIRROR
+};
 
 class PathTracer
 {
@@ -16,10 +27,15 @@ public:
 private:
     int m_width, m_height;
 
-    void toneMap(QRgb *imageData, Eigen::Vector3f *intensityValues);
+    void toneMap(QRgb *imageData, Vector3f *intensityValues);
 
-    Eigen::Vector3f tracePixel(int x, int y, const Scene &scene, const Eigen::Matrix4f &invViewMatrix);
-    Eigen::Vector3f traceRay(const Ray& r, const Scene &scene);
+    int checkType(const tinyobj::material_t *mat);
+
+    Vector4f sampleNextDir(const Mesh *m, Vector3f inv_dir, Vector3f normal, int mode);
+    Vector3f getMirrorVec(Vector3f inv_dir, Vector3f normal);
+
+    __attribute__((force_align_arg_pointer)) Vector3f tracePixel(int x, int y, const Scene &scene, const Eigen::Matrix4f &invViewMatrix);
+    Vector3f traceRay(const Ray& r, const Scene &scene, int depth);
 };
 
 #endif // PATHTRACER_H

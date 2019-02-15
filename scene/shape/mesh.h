@@ -31,13 +31,13 @@ public:
          const std::vector<int> &materialIds,
          const std::vector<tinyobj::material_t> &materials);
 
-    virtual bool getIntersection(const Ray &ray, IntersectionInfo *intersection) const;
+    virtual bool getIntersection(const Ray &ray, IntersectionInfo *intersection) const override; //added override
 
-    virtual Eigen::Vector3f getNormal(const IntersectionInfo &I) const;
+    virtual Eigen::Vector3f getNormal(const IntersectionInfo &I) const override; //added override
 
-    virtual BBox getBBox() const;
+    virtual BBox getBBox() const override; //added override
 
-    virtual Eigen::Vector3f getCentroid() const;
+    virtual Eigen::Vector3f getCentroid() const override; //added override
 
     const Eigen::Vector3i getTriangleIndices(int faceIndex) const;
     const tinyobj::material_t& getMaterial(int faceIndex) const;

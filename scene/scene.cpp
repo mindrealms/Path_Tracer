@@ -129,6 +129,7 @@ void Scene::addPrimitive(CS123ScenePrimitive *prim, const Affine3f &transform, s
     }
 }
 
+//** everything is stored in giant vectors, so shapes/mesh vertex indices/vertex attributes are all parallel-stored */
 Mesh *Scene::loadMesh(std::string filePath, const Affine3f &transform, const std::string &baseDir)
 {
     tinyobj::attrib_t attrib;
@@ -156,13 +157,13 @@ Mesh *Scene::loadMesh(std::string filePath, const Affine3f &transform, const std
     std::vector<Vector3i> faces;
 
     //TODO populate vectors and use tranform
-    for(size_t s = 0; s < shapes.size(); s++) {
+    for(size_t s = 0; s < shapes.size(); s++) { //iterate through all shapes
         size_t index_offset = 0;
-        for(size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
+        for(size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) { //iterate through shape mesh's face vertices
             unsigned int fv = shapes[s].mesh.num_face_vertices[f];
 
             Vector3i face;
-            for(size_t v = 0; v < fv; v++) {
+            for(size_t v = 0; v < fv; v++) { //iterate through curr face's vertices
                 tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
                 tinyobj::real_t vx = attrib.vertices[3*idx.vertex_index+0];
                 tinyobj::real_t vy = attrib.vertices[3*idx.vertex_index+1];
@@ -177,7 +178,7 @@ Mesh *Scene::loadMesh(std::string filePath, const Affine3f &transform, const std
                     nx = attrib.normals[3*idx.normal_index+0];
                     ny = attrib.normals[3*idx.normal_index+1];
                     nz = attrib.normals[3*idx.normal_index+2];
-                } else {
+                } else { //if not defined in file
                     nx = 0;
                     ny = 0;
                     nz = 0;
@@ -185,7 +186,7 @@ Mesh *Scene::loadMesh(std::string filePath, const Affine3f &transform, const std
                 if(idx.texcoord_index != -1) {
                     tx = attrib.texcoords[2*idx.texcoord_index+0];
                     ty = attrib.texcoords[2*idx.texcoord_index+1];
-                } else {
+                } else { //if not defined in file
                     tx = 0;
                     ty = 0;
                 }
@@ -247,7 +248,7 @@ void Scene::addLight(const CS123SceneLightData &data)
     m_lights.push_back(data);
 }
 
-const std::vector<CS123SceneLightData> &Scene::getLights()
+const std::vector<CS123SceneLightData> &Scene::getLights() const
 {
     return m_lights;
 }

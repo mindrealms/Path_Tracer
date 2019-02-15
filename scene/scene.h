@@ -30,7 +30,7 @@ public:
     void setGlobalData(const CS123SceneGlobalData& data);
     void addLight(const CS123SceneLightData& data);
 
-    const std::vector<CS123SceneLightData>& getLights();
+    const std::vector<CS123SceneLightData>& getLights() const;
 
     bool getIntersection(const Ray& ray, IntersectionInfo* I) const;
 
