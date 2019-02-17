@@ -14,20 +14,20 @@ struct Object {
         transform = inverseTransform = normalTransform = inverseNormalTransform = Eigen::Affine3f::Identity();
     }
     virtual ~Object(){}
-  //! All "Objects" must be able to test for intersections with rays.
-  virtual bool getIntersection(
+    //! All "Objects" must be able to test for intersections with rays.
+    virtual bool getIntersection(
       const Ray& ray,
       IntersectionInfo* intersection)
     const = 0;
 
-  //! Return an object normal based on an intersection
-  virtual Eigen::Vector3f getNormal(const IntersectionInfo& I) const = 0;
+    //! Return an object normal based on an intersection
+    virtual Eigen::Vector3f getNormal(const IntersectionInfo& I) const = 0;
 
-  //! Return a bounding box for this object
-  virtual BBox getBBox() const = 0;
+    //! Return a bounding box for this object
+    virtual BBox getBBox() const = 0;
 
-  //! Return the centroid for this object. (Used in BVH Sorting)
-  virtual Eigen::Vector3f getCentroid() const = 0;
+    //! Return the centroid for this object. (Used in BVH Sorting)
+    virtual Eigen::Vector3f getCentroid() const = 0;
 
     CS123SceneMaterial material;
 

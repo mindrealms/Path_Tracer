@@ -65,6 +65,7 @@ bool Scene::load(QString filename, Scene **scenePointer)
     }
 
     *scenePointer = scene;
+
     return true;
 }
 
@@ -114,6 +115,8 @@ void Scene::parseNode(CS123SceneNode *node, const Affine3f &parentTransform, std
         parseNode(child, transform, objects, baseDir);
     }
 }
+
+
 
 void Scene::addPrimitive(CS123ScenePrimitive *prim, const Affine3f &transform, std::vector<Object *> *objects, const std::string &baseDir)
 {

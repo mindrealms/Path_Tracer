@@ -5,10 +5,11 @@
 
 #include "scene/scene.h"
 
-#define N_SAMPLES 1.f       //N number of samples per pixel
+#define N_SAMPLES 100.f       //N number of samples per pixel
 #define START_P 0.2f          //initial (stop) probability (for the first 5 bounces)
 
 using namespace Eigen;
+using namespace std;
 
 enum MODE {
     INVALID = -1,
@@ -34,7 +35,7 @@ private:
     Vector4f sampleNextDir(const Mesh *m, Vector3f inv_dir, Vector3f normal, int mode);
     Vector3f getMirrorVec(Vector3f inv_dir, Vector3f normal);
 
-    __attribute__((force_align_arg_pointer)) Vector3f tracePixel(int x, int y, const Scene &scene, const Eigen::Matrix4f &invViewMatrix);
+    Vector3f tracePixel(int x, int y, const Scene &scene, const Eigen::Matrix4f &invViewMatrix);
     Vector3f traceRay(const Ray& r, const Scene &scene, int depth);
 };
 

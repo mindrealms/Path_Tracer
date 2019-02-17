@@ -34,6 +34,7 @@ public:
 
     bool getIntersection(const Ray& ray, IntersectionInfo* I) const;
 
+
 private:
 
     BVH *m_bvh;
@@ -44,6 +45,7 @@ private:
     CS123SceneGlobalData m_globalData;
 
     std::vector<CS123SceneLightData> m_lights;
+
 
     static bool parseTree(CS123SceneNode *root, Scene *scene, const std::string& baseDir);
     static void parseNode(CS123SceneNode *node, const Eigen::Affine3f &parentTransform, std::vector<Object *> *objects, const std::string& baseDir);

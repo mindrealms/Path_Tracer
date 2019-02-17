@@ -29,12 +29,13 @@ void PathTracer::traceScene(QRgb *imageData, const Scene& scene)
     double duration;
     start = std::clock();
 
+//    scene.checkLights(&scene);
+
     Vector3f intensityValues[m_width * m_height];
     Matrix4f invViewMat = (scene.getCamera().getScaleMatrix() * scene.getCamera().getViewMatrix()).inverse();
     for(int y = 0; y < m_height; ++y) {
 //        #pragma omp parallel for
         for(int x = 0; x < m_width; ++x) {
-            std::cout << "pixel " << x << std::endl;
             int offset = x + (y * m_width);
             intensityValues[offset] = tracePixel(x, y, scene, invViewMat);
         }
@@ -43,10 +44,10 @@ void PathTracer::traceScene(QRgb *imageData, const Scene& scene)
     toneMap(imageData, intensityValues);
 
     duration = ( std::clock() - start ) / (double) CLOCKS_PER_SEC;
-    std::cout<<"Render time: "<< duration <<'\n';
+    std::cout<<"Render time: "<< duration << std::endl;
 }
 
-__attribute__((force_align_arg_pointer)) Vector3f PathTracer::tracePixel(int x, int y, const Scene& scene, const Matrix4f &invViewMatrix)
+Vector3f PathTracer::tracePixel(int x, int y, const Scene& scene, const Matrix4f &invViewMatrix)
 {
     Vector3f p(0, 0, 0); //eye
     Vector3f out(0.f, 0.f, 0.f); //accumulate radiance values over N samples
@@ -79,6 +80,8 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int depth)
         const Triangle *t = static_cast<const Triangle *>(i.data); //Get the triangle in the mesh that was intersected
         const tinyobj::material_t& mat = m->getMaterial(t->getIndex()); //Get the material of the triangle from the mesh
 
+
+
         //surface is a light source
         if (mat.emission[0] || mat.emission[1] || mat.emission[2]) {
             L = Vector3f(mat.emission[0], mat.emission[1], mat.emission[2]); //emitted
@@ -108,51 +111,34 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int depth)
         }
         }
 
-        float pdf_rr = brdf.norm(); //russian roulette - continue probability
+        float pdf_rr; //= brdf.norm(); //russian roulette - continue probability
 
         switch(static_cast<int>(depth < 5)) {
         case 0:
-            if (static_cast<float>(rand())/RAND_MAX < pdf_rr) {
-                break;
-            }
-        default: //first 5 bounces, 80% continue prob
-            if (START_P < pdf_rr) {
-                Ray new_dir(m->inverseTransform * i.hit, next_d);
-                new_dir.transform(m->transform);
-
-                Vector3f radiance = traceRay(new_dir, scene, depth + 1); //recursion
-
-                float dot = (m->transform * new_dir.d).dot(normal);
-                float denom = sample[3] * pdf_rr;
-
-                //change to Vector3f(r.array() * b.array()) ....
-                L[0] += ( radiance[0] * brdf[0] * dot ) / denom; //red
-                L[1] += ( radiance[1] * brdf[1] * dot ) / denom; //green
-                L[2] += ( radiance[2] * brdf[2] * dot ) / denom; //blue
-            }
+            pdf_rr = brdf.norm();
             break;
+        default: //first 5 bounces, 80% continue prob
+            pdf_rr = START_P;
+            break;
+        }
+
+        if (static_cast<float>(rand())/RAND_MAX < pdf_rr) {
+            Ray new_dir(m->inverseTransform * i.hit, next_d);
+            new_dir.transform(m->transform);
+
+            Vector3f radiance = traceRay(new_dir, scene, depth + 1); //recursion
+
+            float dot = (m->transform * new_dir.d).dot(normal);
+            float denom = sample[3] * pdf_rr;
+
+            L += (Vector3f(radiance.array() * brdf.array()) * dot) / denom;
+//            L[0] += ( radiance[0] * brdf[0] * dot ) / denom; //red
+//            L[1] += ( radiance[1] * brdf[1] * dot ) / denom; //green
+//            L[2] += ( radiance[2] * brdf[2] * dot ) / denom; //blue
         }
         if (depth == 0) {
             L += Vector3f(mat.emission[0], mat.emission[1], mat.emission[2]); //emitted
         }
-
-//        if (static_cast<float>(rand())/RAND_MAX < pdf_rr) {
-//            Ray new_dir(m->inverseTransform * i.hit, next_d);
-//            new_dir.transform(m->transform);
-
-//            Vector3f radiance = traceRay(new_dir, scene, depth + 1); //recursion
-
-//            float dot = (m->transform * new_dir.d).dot(normal);
-//            float denom = sample[3] * pdf_rr;
-
-//            //change to Vector3f(r.array() * b.array()) ....
-//            L[0] += ( radiance[0] * brdf[0] * dot ) / denom; //red
-//            L[1] += ( radiance[1] * brdf[1] * dot ) / denom; //green
-//            L[2] += ( radiance[2] * brdf[2] * dot ) / denom; //blue
-//        }
-//        if (depth == 0) {
-//            L += Vector3f(mat.emission[0], mat.emission[1], mat.emission[2]); //emitted
-//        }
     }
     return L;
 }
