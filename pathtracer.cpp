@@ -29,8 +29,6 @@ void PathTracer::traceScene(QRgb *imageData, const Scene& scene)
     double duration;
     start = std::clock();
 
-//    scene.checkLights(&scene);
-
     Vector3f intensityValues[m_width * m_height];
     Matrix4f invViewMat = (scene.getCamera().getScaleMatrix() * scene.getCamera().getViewMatrix()).inverse();
     for(int y = 0; y < m_height; ++y) {
@@ -80,12 +78,12 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int depth)
         const Triangle *t = static_cast<const Triangle *>(i.data); //Get the triangle in the mesh that was intersected
         const tinyobj::material_t& mat = m->getMaterial(t->getIndex()); //Get the material of the triangle from the mesh
 
-
-
         //surface is a light source
-        if (mat.emission[0] || mat.emission[1] || mat.emission[2]) {
-            L = Vector3f(mat.emission[0], mat.emission[1], mat.emission[2]); //emitted
-        }
+//        if (mat.emission[0] || mat.emission[1] || mat.emission[2]) {
+//            L = Vector3f(mat.emission[0], mat.emission[1], mat.emission[2]); //emitted
+//        }
+
+        L = directLighting(scene, i.hit);
 
         int mode = checkType(&mat);
         Vector3f normal = t->getNormal(i).normalized();
@@ -142,6 +140,48 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int depth)
     }
     return L;
 }
+
+
+Vector3f PathTracer::directLighting(const Scene& scene, Vector3f p) {
+
+    std::vector<PathLight> lights = scene.getPathLights();
+
+    int index = rand() % lights.size(); //random light index
+    int r_face = rand() % (lights[index].n_triangles); //random face/triangle
+    std::vector<Vector3f> face = lights[index].faces[r_face]; //1 face (3 points)
+
+    //random point on triangle oh boyyyy here we go
+    float r_1 = static_cast<float>(rand())/RAND_MAX;
+    float r_2 = static_cast<float>(rand())/RAND_MAX;
+    Vector3f rand_p = (1.f - sqrt(r_1)) * face[0] + (sqrt(r_1) * (1.f - r_2)) * face[1] + (sqrt(r_1) * r_2) * face[2];
+
+//    Vector3f A = face[0], B= face[1], C = face[2];
+
+//    rand_p[0] = (1.f - sqrt(r_1)) * A[0] + (sqrt(r_1) * (1.f - r_2)) * B[0] + (sqrt(r_1) * r_2) * C[0];
+//    rand_p[1] = (1.f - sqrt(r_1)) * A[1] + (sqrt(r_1) * (1.f - r_2)) * B[1] + (sqrt(r_1) * r_2) * C[1];
+//    rand_p[2] = (1.f - sqrt(r_1)) * A[2] + (sqrt(r_1) * (1.f - r_2)) * B[2] + (sqrt(r_1) * r_2) * C[2];
+
+//    std::cout << "lights size!! = " << lights.size() << std::endl;
+//    std::cout << "tris = " << lights[0].n_triangles << std::endl;
+//    std::cout << "emission = " << lights[0].emission << std::endl;
+//    std::cout << "intensity = " << lights[0].intensity << std::endl;
+//    std::cout << "avg_pos = " << lights[0].avg_pos << std::endl;
+//    std::cout << "face indices = " << lights[0].faces[0] << ", " << lights[0].faces[1] << std::endl;
+//    std::cout << " ____________________" << std::endl;
+//    std::cout.flush();
+
+//    IntersectionInfo i;
+//    Ray ray(r);
+
+//    if (scene.getIntersection()) {
+
+//    }
+
+    lights[index].emission;
+
+    return Vector3f(0.f, 0.f, 0.f);
+}
+
 
 /* returns Vector4f, where .xyz = outoing direction vector w_o, and .w = pdf float value */
 Vector4f PathTracer::sampleNextDir(const Mesh *m, Vector3f inv_dir, Vector3f normal, int mode) {
@@ -202,10 +242,11 @@ int PathTracer::checkType(const tinyobj::material_t *mat) {
         return MIRROR;
     }
     default: {
-        return INVALID; //woops
+        return INVALID; //woopsay
     }
     }
 }
+
 
 void PathTracer::toneMap(QRgb *imageData, Vector3f *intensityValues) {
     //iterate through img pixels
@@ -221,5 +262,4 @@ void PathTracer::toneMap(QRgb *imageData, Vector3f *intensityValues) {
 
         }
     }
-
 }

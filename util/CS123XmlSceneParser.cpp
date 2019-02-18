@@ -18,7 +18,7 @@
 #define UNSUPPORTED_ELEMENT(e) std::cout << ERROR_AT(e) << "unsupported element <" \
     << e.tagName().toStdString() << ">" << std::endl;
 
-CS123XmlSceneParser::CS123XmlSceneParser(const std::string& name) 
+CS123XmlSceneParser::CS123XmlSceneParser(const std::string& name)
 {
     file_name = name;
 

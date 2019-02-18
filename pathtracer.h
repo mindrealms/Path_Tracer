@@ -35,6 +35,8 @@ private:
     Vector4f sampleNextDir(const Mesh *m, Vector3f inv_dir, Vector3f normal, int mode);
     Vector3f getMirrorVec(Vector3f inv_dir, Vector3f normal);
 
+    Vector3f directLighting(const Scene& scene, Vector3f p);
+
     Vector3f tracePixel(int x, int y, const Scene &scene, const Eigen::Matrix4f &invViewMatrix);
     Vector3f traceRay(const Ray& r, const Scene &scene, int depth);
 };
