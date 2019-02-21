@@ -75,43 +75,24 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int depth)
 
     if(scene.getIntersection(ray, &i)) {
 
-        const Mesh * m = static_cast<const Mesh *>(i.object); //Get the mesh that was intersected
-        const Triangle *t = static_cast<const Triangle *>(i.data); //Get the triangle in the mesh that was intersected
-        const tinyobj::material_t& mat = m->getMaterial(t->getIndex()); //Get the material of the triangle from the mesh
+        const Mesh * m = static_cast<const Mesh *>(i.object); // mesh intersected
+        const Triangle *t = static_cast<const Triangle *>(i.data); // triangle intersected
+        const tinyobj::material_t& mat = m->getMaterial(t->getIndex()); // material of triangle
 
         int mode = checkType(&mat);
         Vector3f normal = t->getNormal(i).normalized();
         Vector4f sample = sampleNextDir(m->getMaterial(t->getIndex()).ior, ray, normal, mode);
         Vector3f next_d = sample.head<3>();
 
+//        L += Vector3f(mat.emission[0], mat.emission[1], mat.emission[2]);
+
         if (mode != MIRROR) {
-            L = Vector3f(directLighting(scene, i.hit, normal).array() * Vector3f(mat.ambient[0], mat.ambient[1], mat.ambient[2]).array()); //w.sp
+            L = Vector3f(directLighting(scene, i.hit, normal, mode, &mat, ray.d, sample[3]).array() *
+                    Vector3f(mat.ambient[0], mat.ambient[1], mat.ambient[2]).array());
         }
 
         //bsdf computation
-        Vector3f bsdf;
-        switch(mode) {
-        case DIFFUSE: {
-            bsdf = Vector3f(mat.diffuse[0]/M_PI, mat.diffuse[1]/M_PI, mat.diffuse[2]/M_PI);
-            break;
-        }
-        case GLOSSY: {
-            float k = ((mat.shininess + 2) / (2*M_PI)) * pow(getMirrorVec(ray.d, normal).dot(next_d), mat.shininess);
-            bsdf = Vector3f(mat.specular[0]*k, mat.specular[1]*k, mat.specular[2]*k);
-            break;
-        }
-        case MIRROR:
-//        {
-//            float k = 1.f / next_d.dot(normal);
-//            bsdf = Vector3f(k, k, k); //Disclaimer: KKK completely unintentional.
-//            break;
-//        }
-        case REFRACTIVE: {
-            float k = 1.f / next_d.dot(normal);
-            bsdf = Vector3f(k, k, k); //Disclaimer: KKK completely unintentional.
-            break;
-        }
-        }
+        Vector3f bsdf = computeBSDF(mode, &mat, &ray, normal, next_d);
 
         float pdf_rr; //russian roulette - continue probability
         switch(static_cast<int>(depth < 5)) {
@@ -123,11 +104,11 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int depth)
             break;
         }
 
+//        if (depth < 10) {
         if (static_cast<float>(rand())/RAND_MAX < pdf_rr) {
-            Ray new_dir(i.hit, next_d); //o.sp
+            Ray new_dir(i.hit, next_d);
             float dot = (new_dir.d).dot(normal);
             float denom = sample[3] * pdf_rr;
-            new_dir.transform(m->transform); //w.sp
 
             Vector3f radiance;
             if (mode == MIRROR) {
@@ -141,12 +122,38 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int depth)
         if (depth == 0) { //surface is a luminaire
             L += Vector3f(mat.emission[0], mat.emission[1], mat.emission[2]);
         }
+//        }
     }
     return L;
 }
 
 
-Vector3f PathTracer::directLighting(const Scene& scene, Vector3f p, Vector3f n) {
+Vector3f PathTracer::computeBSDF(int mode, const tinyobj::material_t *mat, Ray *ray, Vector3f normal, Vector3f next_d) {
+    switch(mode) {
+    case DIFFUSE: {
+        return Vector3f(mat->diffuse[0]/M_PI, mat->diffuse[1]/M_PI, mat->diffuse[2]/M_PI);
+    }
+    case GLOSSY: {
+        float k = ((mat->shininess + 2) / (2*M_PI)) * pow(getMirrorVec(ray->d, normal).dot(next_d), mat->shininess);
+        return Vector3f(mat->specular[0]*k, mat->specular[1]*k, mat->specular[2]*k);
+    }
+    case MIRROR: {
+        float k = 1.f / next_d.dot(normal);
+        return Vector3f(k, k, k); //Disclaimer: KKK completely unintentional.
+    }
+    case REFRACTIVE: {
+        float k = 1.f / next_d.dot(normal);
+        return Vector3f(k, k, k); //Disclaimer: KKK completely unintentional.
+    }
+    default: {
+        return Vector3f(0.f, 0.f, 0.f);
+    }
+    }
+}
+
+
+Vector3f PathTracer::directLighting(const Scene& scene, Vector3f p, Vector3f n, int mode,
+                                    const tinyobj::material_t *mat, Vector3f r, float pdf) {
 
     std::vector<PathLight> lights = scene.getPathLights();
 
@@ -162,25 +169,32 @@ Vector3f PathTracer::directLighting(const Scene& scene, Vector3f p, Vector3f n) 
 
     IntersectionInfo i;
     Ray to_light(p, dir.normalized());
-
     if (scene.getIntersection(to_light, &i)) {
         if ((i.hit[0] - tri_p[0] < EPSILON) && (i.hit[1] - tri_p[1] < EPSILON) && (i.hit[2] - tri_p[2] < EPSILON)) {
+            Ray from_light(tri_p, (-dir).normalized());
+            Vector3f bsdf = computeBSDF(mode, mat, &from_light, n, -r);
 
-            float o_dot = (dir.normalized()).dot(n); //object surface dot
-            const Triangle *t = static_cast<const Triangle *>(i.data);
-            float l_dot = ((-dir).normalized()).dot(t->getNormal(i).normalized()); //light surface dot
 
-            //clampin' -- but not clampin' -- just exitin'
-            if (o_dot < 0 || l_dot < 0) {
+            const Mesh * m = static_cast<const Mesh *>(i.object); // mesh intersected
+            const Triangle *t = static_cast<const Triangle *>(i.data); // triangle intersected
+            const tinyobj::material_t& mat = m->getMaterial(t->getIndex()); // material of triangle
+
+            if (checkType(&mat) == MIRROR) {
                 return Vector3f(0.f, 0.f, 0.f);
             }
 
-            return ((lights[index].emission) * ((o_dot * l_dot) / (dir.norm() * dir.norm()))) * lights[index].area;
+            float o_dot = min(1.f, max(0.f, (dir.normalized()).dot(n))); //object surface dot
+//            const Triangle *t = static_cast<const Triangle *>(i.data);
+            float l_dot = min(1.f, max(0.f, ((-dir).normalized()).dot(t->getNormal(i).normalized()))); //light surface dot
+
+            return Vector3f((lights[index].emission).array() * bsdf.array() *
+                    o_dot * l_dot * lights[index].area) /  (dir.norm() * dir.norm() * pdf);
         }
     }
 
     return Vector3f(0.f, 0.f, 0.f);
 }
+
 
 
 /* returns Vector4f, where .xyz = outoing direction vector w_o, and .w = pdf float value */
@@ -219,40 +233,9 @@ Vector4f PathTracer::sampleNextDir(tinyobj::real_t ior, Ray ray, Vector3f normal
         break; }
     case REFRACTIVE: {
         pdf = 1.f;
-        w_o = -getRefractVec(&ray, normal, ior);
+        w_o = getRefractVec(ray.d, normal, ior);
         break; }
     }
-
-//    if ((mode == DIFFUSE) || (mode == GLOSSY)) {
-//        //random xi (ξ) numbers for hemisphere sampling
-//        float xi_1 = static_cast<float>(rand())/RAND_MAX, xi_2 = static_cast<float>(rand())/RAND_MAX;
-
-//        //defining pdf, and random phi/theta angles
-//        pdf = 1.f/(2*M_PI);
-//        phi = 2.f*M_PI * xi_1;
-//        float theta = acos(xi_2);
-
-//        //vector normal to the plane formed by incident wi and surface normal
-//        Vector3f orth_v = (ray.inv_d).cross(normal);
-
-//        //transformation matrix rotating vector by theta rad around orth_v
-//        Transform<float,3,Affine> theta_rot = Transform<float,3,Affine>::Identity();
-//        theta_rot.rotate(AngleAxisf(theta, orth_v));
-//        w_o = theta_rot * normal;
-
-//        //transformation matrix rotation vector by phi rad around surface normal
-//        Transform <float,3,Affine> phi_rot = Transform<float,3,Affine>::Identity();
-//        phi_rot.rotate(AngleAxisf(phi, normal));
-//        w_o = (phi_rot * w_o).normalized(); //random outgoing direction yay!
-
-//    } else if (mode == MIRROR) {
-//        pdf = 1.f;
-//        w_o = -getMirrorVec(ray.d, normal);
-
-//    } else if (mode == REFRACTIVE) {
-//        pdf = 1.f;
-//        w_o = getRefractVec(ray.d, normal, ior);
-//    }
 
     return vec3Tovec4(w_o, pdf);
 }
@@ -262,28 +245,23 @@ Vector3f PathTracer::getMirrorVec(Vector3f d, Vector3f normal) {
     return (2.f * d.dot(normal) * normal - d).normalized();
 }
 
-Vector3f PathTracer::getRefractVec(Ray *ray, Vector3f normal, tinyobj::real_t ior) {
+Vector3f PathTracer::getRefractVec(Vector3f d, Vector3f normal, tinyobj::real_t ior) {
 
-    float cos_i = min(1.f, max(-1.f, (ray->d).dot(normal)));
-    float etai = 1.f, etat = ior;
-//    float index = 1.f/ior;
+    float cos_i = (d).dot(normal);
+    float index = 1.f/ior;
 
     if (cos_i < 0) { //out -> in
         cos_i = -cos_i;
-//        ior = 1.f / ior;
-//        index = 1.f/ior;
     } else { //in -> out
-//        index = ior;
-        std::swap(etai, etat);
+        index = ior;
         normal = -normal;
     }
 
-//    std::cout << "cos in = " << cos_i << std::endl;
-    float eta = etai/etat;
-    float k = (1.f - (eta*eta) * (1.f - cos_i*cos_i));
-//    std::cout << "root = " << root << std::endl;
-//    std::cout << "cos t = " << cos_t << std::endl;
-    return (k < 0.f ? Vector3f(0.f, 0.f, 0.f) : (eta * ray->d + (eta*cos_i - sqrt(k)) * normal));
+    float k = 1.f - (index*index) * (1.f - cos_i*cos_i);
+    if (k < 0.f) { //total in
+        return getMirrorVec(d, -normal);
+    }
+    return ((index * d + (index*cos_i - sqrt(k)) * normal));
 }
 
 int PathTracer::checkType(const tinyobj::material_t *mat) {
@@ -308,7 +286,6 @@ int PathTracer::checkType(const tinyobj::material_t *mat) {
     }
     }
 }
-
 
 void PathTracer::toneMap(QRgb *imageData, Vector3f *intensityValues) {
     //iterate through img pixels

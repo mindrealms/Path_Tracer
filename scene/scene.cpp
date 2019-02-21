@@ -227,12 +227,12 @@ Mesh *Scene::loadMesh(std::string filePath, const Affine3f &transform, const std
                         if (_lights[i].id == mat_id) {
 
                             std::vector<Vector3f> triangle = {vertices[face[0]], vertices[face[1]], vertices[face[2]]};
-                            assert(normals[face[0]] == normals[face[1]]);
-                            assert(normals[face[1]] == normals[face[2]]);
-                            Vector3f normal = normals[face[0]];
+//                            assert(normals[face[0]] == normals[face[1]]);
+//                            assert(normals[face[1]] == normals[face[2]]);
+//                            Vector3f normal = normals[face[0]];
 
                             _lights[i].faces.push_back(triangle);
-                            _lights[i].normals.push_back(normal);
+//                            _lights[i].normals.push_back(normal);
                             _lights[i].n_triangles += 1;
                             assert(_lights[i].emission == emitted);
                             assert(_lights[i].intensity == emitted.norm());
@@ -242,9 +242,9 @@ Mesh *Scene::loadMesh(std::string filePath, const Affine3f &transform, const std
                     }
                 } else if ((_lights.size() == 0) || not_added ){ //if empty, or not already stored
                     std::vector<Vector3f> triangle = {vertices[face[0]], vertices[face[1]], vertices[face[2]]};
-                    assert(normals[face[0]] == normals[face[1]]);
-                    assert(normals[face[1]] == normals[face[2]]);
-                    Vector3f normal = normals[face[0]];
+//                    assert(normals[face[0]] == normals[face[1]]);
+//                    assert(normals[face[1]] == normals[face[2]]);
+//                    Vector3f normal = normals[face[0]];
 
                     PathLight new_light;
                     new_light.emission = emitted;
@@ -252,7 +252,7 @@ Mesh *Scene::loadMesh(std::string filePath, const Affine3f &transform, const std
                     new_light.n_triangles += 1;
                     new_light.id = mat_id;
                     new_light.faces.push_back(triangle);
-                    new_light.normals.push_back(normal);
+//                    new_light.normals.push_back(normal);
                     _lights.push_back(new_light);
                 }
             }
