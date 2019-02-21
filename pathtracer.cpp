@@ -1,3 +1,4 @@
+
 #include "pathtracer.h"
 
 #include <iostream>
@@ -53,17 +54,17 @@ Vector3f PathTracer::tracePixel(int x, int y, const Scene& scene, const Matrix4f
     for (int i = 0; i < N_SAMPLES; i++) {
 
         //random point on (x,y) pixel
-        float rand_x = static_cast<float>(x) + (static_cast<float>(rand()) / RAND_MAX) + 1;
-        float rand_y = static_cast<float>(y) + (static_cast<float>(rand()) / RAND_MAX) + 1;
+        float rand_x = static_cast<float>(x) + (static_cast<float>(rand()) / RAND_MAX); //+ 1.f
+        float rand_y = static_cast<float>(y) + (static_cast<float>(rand()) / RAND_MAX); // + 1.f
 
-        Vector3f d((2.f * (rand_x) / m_width) - 1.f, 1.f - (2.f * (rand_y) / m_height), -1);
+        Vector3f d((2.f * (rand_x) / m_width) - 1.f, 1.f - (2.f * (rand_y) / m_height), -1.f);
         d.normalize();
 
         Ray r(p, d);
         r = r.transform(invViewMatrix);
-        out += traceRay(r, scene, 0); //traces ray through current pixel, depth = 0
+        out += traceRay(r, scene, 0);
     }
-    return (out/static_cast<float>(N_SAMPLES)); //average out
+    return (out/N_SAMPLES); //average out
 }
 
 Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int depth)
@@ -78,71 +79,74 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int depth)
         const Triangle *t = static_cast<const Triangle *>(i.data); //Get the triangle in the mesh that was intersected
         const tinyobj::material_t& mat = m->getMaterial(t->getIndex()); //Get the material of the triangle from the mesh
 
-        //surface is a light source
-//        if (mat.emission[0] || mat.emission[1] || mat.emission[2]) {
-//            L = Vector3f(mat.emission[0], mat.emission[1], mat.emission[2]); //emitted
-//        }
-
-        L = directLighting(scene, i.hit);
-
         int mode = checkType(&mat);
         Vector3f normal = t->getNormal(i).normalized();
-        Vector4f sample = sampleNextDir(m, ray.inv_d, normal, mode);
+        Vector4f sample = sampleNextDir(m->getMaterial(t->getIndex()).ior, ray, normal, mode);
         Vector3f next_d = sample.head<3>();
 
-        //brdf computation
-        Vector3f brdf;
+        if (mode != MIRROR) {
+            L = Vector3f(directLighting(scene, i.hit, normal).array() * Vector3f(mat.ambient[0], mat.ambient[1], mat.ambient[2]).array()); //w.sp
+        }
+
+        //bsdf computation
+        Vector3f bsdf;
         switch(mode) {
         case DIFFUSE: {
-            brdf = Vector3f(mat.diffuse[0]/M_PI, mat.diffuse[1]/M_PI, mat.diffuse[2]/M_PI);
+            bsdf = Vector3f(mat.diffuse[0]/M_PI, mat.diffuse[1]/M_PI, mat.diffuse[2]/M_PI);
             break;
         }
         case GLOSSY: {
-            float k = (mat.shininess + 2) / (2*M_PI) * pow(getMirrorVec(m->inverseTransform * ray.inv_d, normal).dot(next_d), mat.shininess);
-            brdf = Vector3f(mat.specular[0]*k, mat.specular[1]*k, mat.specular[2]*k);
+            float k = ((mat.shininess + 2) / (2*M_PI)) * pow(getMirrorVec(ray.d, normal).dot(next_d), mat.shininess);
+            bsdf = Vector3f(mat.specular[0]*k, mat.specular[1]*k, mat.specular[2]*k);
             break;
         }
-        case MIRROR: {
-            float k = next_d.dot(normal);
-            brdf = Vector3f(k, k, k);
+        case MIRROR:
+//        {
+//            float k = 1.f / next_d.dot(normal);
+//            bsdf = Vector3f(k, k, k); //Disclaimer: KKK completely unintentional.
+//            break;
+//        }
+        case REFRACTIVE: {
+            float k = 1.f / next_d.dot(normal);
+            bsdf = Vector3f(k, k, k); //Disclaimer: KKK completely unintentional.
             break;
         }
         }
 
-        float pdf_rr; //= brdf.norm(); //russian roulette - continue probability
-
+        float pdf_rr; //russian roulette - continue probability
         switch(static_cast<int>(depth < 5)) {
-        case 0:
-            pdf_rr = brdf.norm();
+        case 0: //bounce past 5th: continue p weighed according to bsdf but clamped above 0.7 (else it was speckly)
+            pdf_rr = max(CLAMP_P, bsdf.norm());
             break;
-        default: //first 5 bounces, 80% continue prob
+        default: //first 5 (non-mirror) bounces, 80% continue prob
             pdf_rr = START_P;
             break;
         }
 
         if (static_cast<float>(rand())/RAND_MAX < pdf_rr) {
-            Ray new_dir(m->inverseTransform * i.hit, next_d);
-            new_dir.transform(m->transform);
-
-            Vector3f radiance = traceRay(new_dir, scene, depth + 1); //recursion
-
-            float dot = (m->transform * new_dir.d).dot(normal);
+            Ray new_dir(i.hit, next_d); //o.sp
+            float dot = (new_dir.d).dot(normal);
             float denom = sample[3] * pdf_rr;
+            new_dir.transform(m->transform); //w.sp
 
-            L += (Vector3f(radiance.array() * brdf.array()) * dot) / denom;
-//            L[0] += ( radiance[0] * brdf[0] * dot ) / denom; //red
-//            L[1] += ( radiance[1] * brdf[1] * dot ) / denom; //green
-//            L[2] += ( radiance[2] * brdf[2] * dot ) / denom; //blue
+            Vector3f radiance;
+            if (mode == MIRROR) {
+                radiance = traceRay(new_dir, scene, depth); //not increasing depth for mirror rays
+            } else  {
+                radiance = traceRay(new_dir, scene, depth + 1);
+            }
+
+            L += (Vector3f(radiance.array() * bsdf.array()) * dot) / denom;
         }
-        if (depth == 0) {
-            L += Vector3f(mat.emission[0], mat.emission[1], mat.emission[2]); //emitted
+        if (depth == 0) { //surface is a luminaire
+            L += Vector3f(mat.emission[0], mat.emission[1], mat.emission[2]);
         }
     }
     return L;
 }
 
 
-Vector3f PathTracer::directLighting(const Scene& scene, Vector3f p) {
+Vector3f PathTracer::directLighting(const Scene& scene, Vector3f p, Vector3f n) {
 
     std::vector<PathLight> lights = scene.getPathLights();
 
@@ -150,56 +154,54 @@ Vector3f PathTracer::directLighting(const Scene& scene, Vector3f p) {
     int r_face = rand() % (lights[index].n_triangles); //random face/triangle
     std::vector<Vector3f> face = lights[index].faces[r_face]; //1 face (3 points)
 
-    //random point on triangle oh boyyyy here we go
+    //random point on triangle
     float r_1 = static_cast<float>(rand())/RAND_MAX;
     float r_2 = static_cast<float>(rand())/RAND_MAX;
-    Vector3f rand_p = (1.f - sqrt(r_1)) * face[0] + (sqrt(r_1) * (1.f - r_2)) * face[1] + (sqrt(r_1) * r_2) * face[2];
+    Vector3f tri_p = (1.f - sqrt(r_1)) * face[0] + (sqrt(r_1) * (1.f - r_2)) * face[1] + (sqrt(r_1) * r_2) * face[2];
+    Vector3f dir = tri_p - p;
 
-//    Vector3f A = face[0], B= face[1], C = face[2];
+    IntersectionInfo i;
+    Ray to_light(p, dir.normalized());
 
-//    rand_p[0] = (1.f - sqrt(r_1)) * A[0] + (sqrt(r_1) * (1.f - r_2)) * B[0] + (sqrt(r_1) * r_2) * C[0];
-//    rand_p[1] = (1.f - sqrt(r_1)) * A[1] + (sqrt(r_1) * (1.f - r_2)) * B[1] + (sqrt(r_1) * r_2) * C[1];
-//    rand_p[2] = (1.f - sqrt(r_1)) * A[2] + (sqrt(r_1) * (1.f - r_2)) * B[2] + (sqrt(r_1) * r_2) * C[2];
+    if (scene.getIntersection(to_light, &i)) {
+        if ((i.hit[0] - tri_p[0] < EPSILON) && (i.hit[1] - tri_p[1] < EPSILON) && (i.hit[2] - tri_p[2] < EPSILON)) {
 
-//    std::cout << "lights size!! = " << lights.size() << std::endl;
-//    std::cout << "tris = " << lights[0].n_triangles << std::endl;
-//    std::cout << "emission = " << lights[0].emission << std::endl;
-//    std::cout << "intensity = " << lights[0].intensity << std::endl;
-//    std::cout << "avg_pos = " << lights[0].avg_pos << std::endl;
-//    std::cout << "face indices = " << lights[0].faces[0] << ", " << lights[0].faces[1] << std::endl;
-//    std::cout << " ____________________" << std::endl;
-//    std::cout.flush();
+            float o_dot = (dir.normalized()).dot(n); //object surface dot
+            const Triangle *t = static_cast<const Triangle *>(i.data);
+            float l_dot = ((-dir).normalized()).dot(t->getNormal(i).normalized()); //light surface dot
 
-//    IntersectionInfo i;
-//    Ray ray(r);
+            //clampin' -- but not clampin' -- just exitin'
+            if (o_dot < 0 || l_dot < 0) {
+                return Vector3f(0.f, 0.f, 0.f);
+            }
 
-//    if (scene.getIntersection()) {
-
-//    }
-
-    lights[index].emission;
+            return ((lights[index].emission) * ((o_dot * l_dot) / (dir.norm() * dir.norm()))) * lights[index].area;
+        }
+    }
 
     return Vector3f(0.f, 0.f, 0.f);
 }
 
 
 /* returns Vector4f, where .xyz = outoing direction vector w_o, and .w = pdf float value */
-Vector4f PathTracer::sampleNextDir(const Mesh *m, Vector3f inv_dir, Vector3f normal, int mode) {
+Vector4f PathTracer::sampleNextDir(tinyobj::real_t ior, Ray ray, Vector3f normal, int mode) {
 
     Vector3f w_o(0.f, 0.f, 0.f);
     float phi, pdf = 0.f;
 
-    if ((mode == DIFFUSE) || (mode == GLOSSY)) {
+    switch(mode){
+    case DIFFUSE:
+    case GLOSSY: {
         //random xi (ξ) numbers for hemisphere sampling
         float xi_1 = static_cast<float>(rand())/RAND_MAX, xi_2 = static_cast<float>(rand())/RAND_MAX;
 
         //defining pdf, and random phi/theta angles
         pdf = 1.f/(2*M_PI);
         phi = 2.f*M_PI * xi_1;
-        float theta = acos(1.f - xi_2);
+        float theta = acos(xi_2);
 
         //vector normal to the plane formed by incident wi and surface normal
-        Vector3f orth_v = ((m->inverseTransform * inv_dir).normalized()).cross(normal);
+        Vector3f orth_v = (ray.inv_d).cross(normal);
 
         //transformation matrix rotating vector by theta rad around orth_v
         Transform<float,3,Affine> theta_rot = Transform<float,3,Affine>::Identity();
@@ -210,22 +212,79 @@ Vector4f PathTracer::sampleNextDir(const Mesh *m, Vector3f inv_dir, Vector3f nor
         Transform <float,3,Affine> phi_rot = Transform<float,3,Affine>::Identity();
         phi_rot.rotate(AngleAxisf(phi, normal));
         w_o = (phi_rot * w_o).normalized(); //random outgoing direction yay!
-
-    } else if (mode == MIRROR) {
+        break; }
+    case MIRROR: {
         pdf = 1.f;
-        w_o = getMirrorVec(m->inverseTransform * inv_dir, normal);
+        w_o = -getMirrorVec(ray.d, normal);
+        break; }
+    case REFRACTIVE: {
+        pdf = 1.f;
+        w_o = -getRefractVec(&ray, normal, ior);
+        break; }
     }
+
+//    if ((mode == DIFFUSE) || (mode == GLOSSY)) {
+//        //random xi (ξ) numbers for hemisphere sampling
+//        float xi_1 = static_cast<float>(rand())/RAND_MAX, xi_2 = static_cast<float>(rand())/RAND_MAX;
+
+//        //defining pdf, and random phi/theta angles
+//        pdf = 1.f/(2*M_PI);
+//        phi = 2.f*M_PI * xi_1;
+//        float theta = acos(xi_2);
+
+//        //vector normal to the plane formed by incident wi and surface normal
+//        Vector3f orth_v = (ray.inv_d).cross(normal);
+
+//        //transformation matrix rotating vector by theta rad around orth_v
+//        Transform<float,3,Affine> theta_rot = Transform<float,3,Affine>::Identity();
+//        theta_rot.rotate(AngleAxisf(theta, orth_v));
+//        w_o = theta_rot * normal;
+
+//        //transformation matrix rotation vector by phi rad around surface normal
+//        Transform <float,3,Affine> phi_rot = Transform<float,3,Affine>::Identity();
+//        phi_rot.rotate(AngleAxisf(phi, normal));
+//        w_o = (phi_rot * w_o).normalized(); //random outgoing direction yay!
+
+//    } else if (mode == MIRROR) {
+//        pdf = 1.f;
+//        w_o = -getMirrorVec(ray.d, normal);
+
+//    } else if (mode == REFRACTIVE) {
+//        pdf = 1.f;
+//        w_o = getRefractVec(ray.d, normal, ior);
+//    }
 
     return vec3Tovec4(w_o, pdf);
 }
 
 
-Vector3f PathTracer::getMirrorVec(Vector3f inv_dir, Vector3f normal) {
-    Transform <float,3,Affine> refl_rot = Transform<float,3,Affine>::Identity();
-    refl_rot.rotate(AngleAxisf(M_PI, normal));
-    return (refl_rot * (inv_dir)).normalized();
+Vector3f PathTracer::getMirrorVec(Vector3f d, Vector3f normal) {
+    return (2.f * d.dot(normal) * normal - d).normalized();
 }
 
+Vector3f PathTracer::getRefractVec(Ray *ray, Vector3f normal, tinyobj::real_t ior) {
+
+    float cos_i = min(1.f, max(-1.f, (ray->d).dot(normal)));
+    float etai = 1.f, etat = ior;
+//    float index = 1.f/ior;
+
+    if (cos_i < 0) { //out -> in
+        cos_i = -cos_i;
+//        ior = 1.f / ior;
+//        index = 1.f/ior;
+    } else { //in -> out
+//        index = ior;
+        std::swap(etai, etat);
+        normal = -normal;
+    }
+
+//    std::cout << "cos in = " << cos_i << std::endl;
+    float eta = etai/etat;
+    float k = (1.f - (eta*eta) * (1.f - cos_i*cos_i));
+//    std::cout << "root = " << root << std::endl;
+//    std::cout << "cos t = " << cos_t << std::endl;
+    return (k < 0.f ? Vector3f(0.f, 0.f, 0.f) : (eta * ray->d + (eta*cos_i - sqrt(k)) * normal));
+}
 
 int PathTracer::checkType(const tinyobj::material_t *mat) {
     switch(mat->illum) {
@@ -240,6 +299,9 @@ int PathTracer::checkType(const tinyobj::material_t *mat) {
     }
     case 5: {
         return MIRROR;
+    }
+    case 7: {
+        return REFRACTIVE;
     }
     default: {
         return INVALID; //woopsay
@@ -259,7 +321,7 @@ void PathTracer::toneMap(QRgb *imageData, Vector3f *intensityValues) {
             float green = (intensityValues[offset][1] / (1+intensityValues[offset][1]))*255.f;
             float blue = (intensityValues[offset][2] / (1+intensityValues[offset][2]))*255.f;
             imageData[offset] = qRgb(red, green, blue);
-
         }
     }
 }
+

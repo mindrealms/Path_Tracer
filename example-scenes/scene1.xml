@@ -19,7 +19,7 @@
 	<object type="tree" name="root">
 		<transblock>
 			<rotate x="0" y="0" z="1" angle="0"/>
-			<object type="primitive" name="mesh" filename="models/MedievalBoat/MedievalBoat.obj">
+                <object type="primitive" name="mesh" filename="models/Erato/erato-1.obj">
 				<blend v="1.0"/>
 				<reflective r="0.9" g="0.9" b="0.9"/>
 				<diffuse r="1.0" g="1.0" b="1.0"/>

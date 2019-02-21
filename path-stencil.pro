@@ -18,6 +18,8 @@ DEFINES += QT_DEPRECATED_WARNINGS
 QMAKE_CXXFLAGS += -msse2
 #QMAKE_CXXFLAGS += -fopenmp
 #LIBS += -fopenmp
+QMAKE_LFLAGS += -stdlib=libc++
+QMAKE_CXXFLAGS += -stdlib=libc++
 
 
 

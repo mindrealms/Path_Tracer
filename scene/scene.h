@@ -19,9 +19,10 @@ typedef struct  {
     int n_triangles = 0;                                //number of triangles/faces
     Eigen::Vector3f emission;                           //emitted energy (assuming uniform over all triangles)
     Eigen::Vector3f avg_pos;                            //average position of all triangles --- BAAAAAABE CHANGE THIS LATER TO BE MORE ACCURATE
+    float area = 0;                                     //total area of light source
     float intensity;                                    //light intensity (magnitude of emission vector)
     std::vector<std::vector<Eigen::Vector3f>> faces;    //vector of all triangles of light (each containing 3 vertices)
-    std::vector<std::vector<Eigen::Vector3f>> normals;  //vector of all normals of triangle vertices
+    std::vector<Eigen::Vector3f> normals;               //vector of all normals of triangle vertices
 } PathLight;
 
 
