@@ -19,8 +19,8 @@
     const std::string diffuseTex = mat.diffuse_texname; //Diffuse texture name
 */
 
-PathTracer::PathTracer(int width, int height)
-    : m_width(width), m_height(height)
+PathTracer::PathTracer(int width, int height, int samples)
+    : m_width(width), m_height(height), m_samples(samples)
 {
 }
 
@@ -46,25 +46,35 @@ void PathTracer::traceScene(QRgb *imageData, const Scene& scene)
     std::cout<<"Render time: "<< duration << std::endl;
 }
 
-Vector3f PathTracer::tracePixel(int x, int y, const Scene& scene, const Matrix4f &invViewMatrix)
-{
+
+Vector3f PathTracer::tracePixel(int x, int y, const Scene& scene, const Matrix4f &invViewMatrix) {
     Vector3f p(0, 0, 0); //eye
     Vector3f out(0.f, 0.f, 0.f); //accumulate radiance values over N samples
 
-    for (int i = 0; i < N_SAMPLES; i++) {
+    for (int g_x = 0; g_x < GRID_DIM; g_x++) {
+        for (int g_y = 0; g_y < GRID_DIM; g_y++) {
 
-        //random point on (x,y) pixel
-        float rand_x = static_cast<float>(x) + (static_cast<float>(rand()) / RAND_MAX); //+ 1.f
-        float rand_y = static_cast<float>(y) + (static_cast<float>(rand()) / RAND_MAX); // + 1.f
+            for (int i = 0; i < m_samples; i++) {
 
-        Vector3f d((2.f * (rand_x) / m_width) - 1.f, 1.f - (2.f * (rand_y) / m_height), -1.f);
-        d.normalize();
+                //random point on (x,y) pixel
+        //        float rand_x = static_cast<float>(x) + (static_cast<float>(rand()) / RAND_MAX); //+ 1.f
+        //        float rand_y = static_cast<float>(y) + (static_cast<float>(rand()) / RAND_MAX); // + 1.f
 
-        Ray r(p, d);
-        r = r.transform(invViewMatrix);
-        out += traceRay(r, scene, 0);
+                float rand_x = static_cast<float>(x) + stratifiedSample(g_x+1.f, BASE_X);
+                float rand_y = static_cast<float>(y) + stratifiedSample(g_y+1.f, BASE_Y);
+
+                Vector3f d((2.f * (rand_x) / m_width) - 1.f, 1.f - (2.f * (rand_y) / m_height), -1.f);
+                d.normalize();
+
+                Ray r(p, d);
+                r = r.transform(invViewMatrix);
+                out += traceRay(r, scene, 0);
+            }
+            out /= static_cast<float>(m_samples);
+        }
     }
-    return (out/N_SAMPLES); //average out
+
+    return (out); //average out
 }
 
 Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int depth)
@@ -84,10 +94,8 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int depth)
         Vector4f sample = sampleNextDir(m->getMaterial(t->getIndex()).ior, ray, normal, &mode);
         Vector3f next_d = sample.head<3>();
 
-        if (mode != MIRROR) {
-            L = Vector3f(directLighting(scene, i.hit, normal, mode, &mat, ray.d, sample[3]).array() *
-                    Vector3f(mat.ambient[0], mat.ambient[1], mat.ambient[2]).array());
-        }
+        L = Vector3f(directLighting(scene, i.hit, normal, mode, ray.d, sample[3], &mat).array() *
+                Vector3f(mat.ambient[0], mat.ambient[1], mat.ambient[2]).array());
 
         //bsdf computation
         Vector3f bsdf = computeBSDF(mode, &mat, &ray, normal, next_d);
@@ -108,8 +116,8 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int depth)
             float denom = sample[3] * pdf_rr;
 
             Vector3f radiance;
-            if (mode == MIRROR) {
-                radiance = traceRay(new_dir, scene, depth); //not increasing depth for mirror rays
+            if (mode == MIRROR || mode == REFRACTIVE) {
+                radiance = traceRay(new_dir, scene, 0); //not increasing depth for mirror rays
             } else  {
                 radiance = traceRay(new_dir, scene, depth + 1);
             }
@@ -135,11 +143,11 @@ Vector3f PathTracer::computeBSDF(int mode, const tinyobj::material_t *mat, Ray *
     }
     case MIRROR: {
         float k = 1.f / next_d.dot(normal);
-        return Vector3f(k, k, k); //Disclaimer: KKK completely unintentional.
+        return Vector3f(k, k, k); //Serious note: KKK completely unintentional.
     }
     case REFRACTIVE: {
         float k = 1.f / next_d.dot(normal);
-        return Vector3f(k, k, k); //Disclaimer: KKK completely unintentional.
+        return Vector3f(k, k, k); //Serious note: KKK completely unintentional.
     }
     default: {
         return Vector3f(0.f, 0.f, 0.f);
@@ -148,8 +156,7 @@ Vector3f PathTracer::computeBSDF(int mode, const tinyobj::material_t *mat, Ray *
 }
 
 
-Vector3f PathTracer::directLighting(const Scene& scene, Vector3f p, Vector3f n, int mode,
-                                    const tinyobj::material_t *mat, Vector3f r, float pdf) {
+Vector3f PathTracer::directLighting(const Scene& scene, Vector3f p, Vector3f n, int mode, Vector3f r, float pdf, const tinyobj::material_t *mat) {
 
     std::vector<PathLight> lights = scene.getPathLights();
 
@@ -166,21 +173,19 @@ Vector3f PathTracer::directLighting(const Scene& scene, Vector3f p, Vector3f n, 
     IntersectionInfo i;
     Ray to_light(p, dir.normalized());
     if (scene.getIntersection(to_light, &i)) {
+
+        const Mesh * m = static_cast<const Mesh *>(i.object); // mesh intersected
+        const Triangle *t = static_cast<const Triangle *>(i.data); // triangle intersected
+        const tinyobj::material_t& material = m->getMaterial(t->getIndex()); // material of triangle
+
+        if (checkType(&material) == REFRACTIVE || checkType(&material) == MIRROR) { //is mirror even needed
+            return Vector3f(0.f, 0.f, 0.f);
+        }
+
+        //luminaire
         if ((i.hit[0] - tri_p[0] < EPSILON) && (i.hit[1] - tri_p[1] < EPSILON) && (i.hit[2] - tri_p[2] < EPSILON)) {
             Ray from_light(tri_p, (-dir).normalized());
             Vector3f bsdf = computeBSDF(mode, mat, &from_light, n, -r);
-
-            const Mesh * m = static_cast<const Mesh *>(i.object); // mesh intersected
-            const Triangle *t = static_cast<const Triangle *>(i.data); // triangle intersected
-            const tinyobj::material_t& mat = m->getMaterial(t->getIndex()); // material of triangle
-
-            if (checkType(&mat) == MIRROR) {
-                return Vector3f(0.f, 0.f, 0.f);
-            }
-            if (checkType(&mat) == REFRACTIVE) {
-                return Vector3f(0.f, 0.f, 0.f);
-//                return getRefractVec(from_light.d, n, mat.ior);
-            }
 
             float o_dot = min(1.f, max(0.f, (dir.normalized()).dot(n))); //object surface dot
             float l_dot = min(1.f, max(0.f, ((-dir).normalized()).dot(t->getNormal(i).normalized()))); //light surface dot
@@ -231,7 +236,7 @@ Vector4f PathTracer::sampleNextDir(tinyobj::real_t ior, Ray ray, Vector3f normal
         break; }
     case REFRACTIVE: {
         pdf = 1.f;
-        w_o = getRefractVec(ray.d, normal, ior, &pdf, mode).normalized();
+        w_o = getRefractVec(ray.d, normal, ior, mode).normalized();
         break; }
     }
 
@@ -243,7 +248,7 @@ Vector3f PathTracer::getMirrorVec(Vector3f d, Vector3f normal) {
     return (2.f * d.dot(normal) * normal - d).normalized();
 }
 
-Vector3f PathTracer::getRefractVec(Vector3f d, Vector3f &normal, tinyobj::real_t ior, float *pdf, int *mode) { //, float *pdf, int *mode
+Vector3f PathTracer::getRefractVec(Vector3f d, Vector3f &normal, tinyobj::real_t ior, int *mode) { //, float *pdf, int *mode
 
     float cos_i = max(-1.f, min(1.f, d.dot(normal)));
     float n_i = 1.f, n_t = ior;
@@ -260,15 +265,13 @@ Vector3f PathTracer::getRefractVec(Vector3f d, Vector3f &normal, tinyobj::real_t
     float k = 1.f - ((n_i/n_t)*(n_i/n_t)) * (1.f - cos_i*cos_i);
 
     if (k < 0.f) { //total internal
-        *pdf = 1.f;
         *mode = MIRROR;
         return getMirrorVec(d, -normal);
     } else if (static_cast<float>(rand())/RAND_MAX < schlick) { //reflect
-        *pdf = schlick;
         *mode = MIRROR;
-        return getMirrorVec(d, normal);
+        return getMirrorVec(-d, normal);
     }
-    *pdf = 1.f - schlick;
+    //refract
     return (((n_i/n_t) * d + ((n_i/n_t)*cos_i - sqrt(k)) * normal));
 }
 
@@ -291,7 +294,7 @@ int PathTracer::checkType(const tinyobj::material_t *mat) {
         return REFRACTIVE;
     }
     default: {
-        return INVALID; //woopsay
+        return INVALID; //woops
     }
     }
 }
@@ -307,62 +310,19 @@ void PathTracer::toneMap(QRgb *imageData, Vector3f *intensityValues) {
             float green = (intensityValues[offset][1] / (1+intensityValues[offset][1]))*255.f;
             float blue = (intensityValues[offset][2] / (1+intensityValues[offset][2]))*255.f;
             imageData[offset] = qRgb(red, green, blue);
+
+            //L divided b the average radiance across the scene, or the log -- helps to normalize to the overall brightness
         }
     }
 }
 
+float PathTracer::stratifiedSample(int index, int base){
+  float f = 1.f, r = 0.f;
+  while(index > 0){
+    f = f/base;
+    r = r + f* (index% base);
+    index = index/base;
+  }
 
-
-
-float PathTracer::computeFresnel(Vector3f d, Vector3f normal, tinyobj::real_t ior) {
-
-
-//    float cosi = max(-1.f, min(1.f, d.dot(normal)));
-//    float etai = 1, etat = ior;
-//    if (cosi > 0) { std::swap(etai, etat); }
-//    // Compute sini using Snell's law
-//    float sint = etai / etat * sqrtf(std::max(0.f, 1 - cosi * cosi));
-//    // Total internal reflection
-//    if (sint >= 1) {
-//        return 1;
-//    }
-//    else {
-//        float cost = sqrtf(std::max(0.f, 1 - sint * sint));
-//        cosi = fabsf(cosi);
-//        float Rs = ((etat * cosi) - (etai * cost)) / ((etat * cosi) + (etai * cost));
-//        float Rp = ((etai * cosi) - (etat * cost)) / ((etai * cosi) + (etat * cost));
-//        return (Rs * Rs + Rp * Rp) / 2;
-//    }
-    // As a consequence of the conservation of energy, transmittance is given by:
-    // kt = 1 - kr;
+  return r;
 }
-
-//Vector3f PathTracer::getRefractVec(Vector3f d, Vector3f normal, tinyobj::real_t ior, float &fresnel) {
-
-//    float cos_i = (d).dot(normal); //clamp this
-//    float r_in = 1.f;
-//    float r_tr = ior;
-
-//    if (cos_i < 0) { //out -> in
-//        cos_i = -cos_i;
-//    } else { //in -> out
-//        swap(r_in, r_tr);
-//        normal = -normal;
-//    }
-
-//    float sin_t = r_in/r_tr * sqrt(std::max(0.f, 1.f - cos_i * cos_i));
-//    if (sin_t >= 1.f) { //total internal reflection
-//        fresnel = 1;
-//        return getMirrorVec(d, -normal);
-//    } else {
-//        float cos_t = sqrtf(std::max(0.f, 1.f - sin_t * sin_t));
-//        cos_i = fabsf(cos_i);
-//        float Rs = ((r_tr * cos_i) - (r_in * cos_t)) / ((r_tr * cos_i) + (r_in * cos_t));
-//        float Rp = ((r_in * cos_i) - (r_tr * cos_t)) / ((r_in * cos_i) + (r_tr * cos_t));
-//        fresnel = (Rs * Rs + Rp * Rp) / 2;
-
-//        float k = 1.f - ((r_in/r_tr)*(r_in/r_tr)) * (1.f - cos_i*cos_i);
-//        return (((r_in/r_tr) * d + ((r_in/r_tr)*cos_i - sqrt(k)) * normal));
-//    }
-//}
-

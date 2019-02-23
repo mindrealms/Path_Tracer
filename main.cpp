@@ -22,13 +22,14 @@ int main(int argc, char *argv[])
     parser.process(a);
 
     const QStringList args = parser.positionalArguments();
-    if(args.size() != 2) {
+    if(args.size() != 3) {
         std::cerr << "Error: Wrong number of arguments" << std::endl;
         a.exit(1);
         return 1;
     }
     QString scenefile = args[0];
     QString output = args[1];
+    int samples = args[2].toInt();
 
     QImage image(IMAGE_WIDTH, IMAGE_HEIGHT, QImage::Format_RGB32);
 
@@ -39,7 +40,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    PathTracer tracer(IMAGE_WIDTH, IMAGE_HEIGHT);
+    PathTracer tracer(IMAGE_WIDTH, IMAGE_HEIGHT, samples);
 
     QRgb *data = reinterpret_cast<QRgb *>(image.bits());
 

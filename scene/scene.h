@@ -22,7 +22,6 @@ typedef struct  {
     float area = 0;                                     //total area of light source
     float intensity;                                    //light intensity (magnitude of emission vector)
     std::vector<std::vector<Eigen::Vector3f>> faces;    //vector of all triangles of light (each containing 3 vertices)
-//    std::vector<Eigen::Vector3f> normals;               //vector of all normals of triangle vertices
 } PathLight;
 
 
