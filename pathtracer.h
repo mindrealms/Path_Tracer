@@ -9,8 +9,8 @@
 #define START_P 0.8f        //initial (stop) probability (for the first 5 bounces)
 #define CLAMP_P 0.7f        //stop probability for > 5 bounces (edit later maybe???? is it too high?)
 #define EPSILON 0.0001f       //epsilon term (direct lighting -- to check for light intersection vs occlusion)
-#define BASE_X 2.f
-#define BASE_Y 3.f
+#define BASE_X 2
+#define BASE_Y 3
 #define GRID_DIM 10         //dimension of stratified sampling grid
 
 using namespace Eigen;

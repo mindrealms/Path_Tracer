@@ -43,7 +43,7 @@ void PathTracer::traceScene(QRgb *imageData, const Scene& scene)
     toneMap(imageData, intensityValues);
 
     duration = ( std::clock() - start ) / (double) CLOCKS_PER_SEC;
-    std::cout<<"Render time: "<< duration << std::endl;
+    std::cout << "Render time: "<< duration << std::endl;
 }
 
 
@@ -70,11 +70,10 @@ Vector3f PathTracer::tracePixel(int x, int y, const Scene& scene, const Matrix4f
                 r = r.transform(invViewMatrix);
                 out += traceRay(r, scene, 0);
             }
-            out /= static_cast<float>(m_samples);
         }
     }
 
-    return (out); //average out
+    return (out / static_cast<float>(m_samples * GRID_DIM * GRID_DIM)); //average out
 }
 
 Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int depth)
@@ -93,6 +92,9 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int depth)
         Vector3f normal = t->getNormal(i).normalized();
         Vector4f sample = sampleNextDir(m->getMaterial(t->getIndex()).ior, ray, normal, &mode);
         Vector3f next_d = sample.head<3>();
+
+        //ray.o is your og position
+        //if the samplenextdir returned a refracted vector,
 
         L = Vector3f(directLighting(scene, i.hit, normal, mode, ray.d, sample[3], &mat).array() *
                 Vector3f(mat.ambient[0], mat.ambient[1], mat.ambient[2]).array());
@@ -117,7 +119,7 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int depth)
 
             Vector3f radiance;
             if (mode == MIRROR || mode == REFRACTIVE) {
-                radiance = traceRay(new_dir, scene, 0); //not increasing depth for mirror rays
+                radiance = traceRay(new_dir, scene, 0);
             } else  {
                 radiance = traceRay(new_dir, scene, depth + 1);
             }
@@ -141,10 +143,11 @@ Vector3f PathTracer::computeBSDF(int mode, const tinyobj::material_t *mat, Ray *
         float k = ((mat->shininess + 2) / (2*M_PI)) * pow(getMirrorVec(ray->d, normal).dot(next_d), mat->shininess);
         return Vector3f(mat->specular[0]*k, mat->specular[1]*k, mat->specular[2]*k);
     }
-    case MIRROR: {
-        float k = 1.f / next_d.dot(normal);
-        return Vector3f(k, k, k); //Serious note: KKK completely unintentional.
-    }
+    case MIRROR:
+//    {
+//        float k = 1.f / next_d.dot(normal);
+//        return Vector3f(k, k, k); //Serious note: KKK completely unintentional.
+//    }
     case REFRACTIVE: {
         float k = 1.f / next_d.dot(normal);
         return Vector3f(k, k, k); //Serious note: KKK completely unintentional.
@@ -178,11 +181,11 @@ Vector3f PathTracer::directLighting(const Scene& scene, Vector3f p, Vector3f n, 
         const Triangle *t = static_cast<const Triangle *>(i.data); // triangle intersected
         const tinyobj::material_t& material = m->getMaterial(t->getIndex()); // material of triangle
 
-        if (checkType(&material) == REFRACTIVE || checkType(&material) == MIRROR) { //is mirror even needed
+        if (checkType(&material) == REFRACTIVE || checkType(&material) == MIRROR) {
             return Vector3f(0.f, 0.f, 0.f);
         }
 
-        //luminaire
+        //surface is the luminaire
         if ((i.hit[0] - tri_p[0] < EPSILON) && (i.hit[1] - tri_p[1] < EPSILON) && (i.hit[2] - tri_p[2] < EPSILON)) {
             Ray from_light(tri_p, (-dir).normalized());
             Vector3f bsdf = computeBSDF(mode, mat, &from_light, n, -r);
@@ -197,7 +200,6 @@ Vector3f PathTracer::directLighting(const Scene& scene, Vector3f p, Vector3f n, 
 
     return Vector3f(0.f, 0.f, 0.f);
 }
-
 
 
 /* returns Vector4f, where .xyz = outoing direction vector w_o, and .w = pdf float value */
@@ -264,15 +266,14 @@ Vector3f PathTracer::getRefractVec(Vector3f d, Vector3f &normal, tinyobj::real_t
     float schlick = r_o + (1.f - r_o) * pow((1.f - cos_i), 5.f); //% reflected
     float k = 1.f - ((n_i/n_t)*(n_i/n_t)) * (1.f - cos_i*cos_i);
 
-    if (k < 0.f) { //total internal
+    if (k < 0.f) {
         *mode = MIRROR;
-        return getMirrorVec(d, -normal);
-    } else if (static_cast<float>(rand())/RAND_MAX < schlick) { //reflect
+        return getMirrorVec(d, -normal); //total internal reflection
+    } else if (static_cast<float>(rand())/RAND_MAX < schlick) {
         *mode = MIRROR;
-        return getMirrorVec(-d, normal);
+        return getMirrorVec(-d, normal); //ideal reflection
     }
-    //refract
-    return (((n_i/n_t) * d + ((n_i/n_t)*cos_i - sqrt(k)) * normal));
+    return (((n_i/n_t) * d + ((n_i/n_t)*cos_i - sqrt(k)) * normal)); //refraction
 }
 
 
@@ -281,7 +282,7 @@ int PathTracer::checkType(const tinyobj::material_t *mat) {
     case 2: {
         float diff = Vector3f(mat->diffuse[0], mat->diffuse[1], mat->diffuse[2]).norm();
         float spec = Vector3f(mat->specular[0], mat->specular[1], mat->specular[2]).norm();
-        float type = std::max(diff,spec); // for now
+        float type = std::max(diff,spec); // for now ! ! !
 
         if (type == diff) { return DIFFUSE; }
         else if (type == spec) { return GLOSSY; }
@@ -311,18 +312,18 @@ void PathTracer::toneMap(QRgb *imageData, Vector3f *intensityValues) {
             float blue = (intensityValues[offset][2] / (1+intensityValues[offset][2]))*255.f;
             imageData[offset] = qRgb(red, green, blue);
 
-            //L divided b the average radiance across the scene, or the log -- helps to normalize to the overall brightness
+            //L divided by the average radiance across the scene, or the log -- helps to normalize to the overall brightness
         }
     }
 }
 
 float PathTracer::stratifiedSample(int index, int base){
-  float f = 1.f, r = 0.f;
-  while(index > 0){
+  float f = 1.f, random = 0.f;
+  while (index > 0){
     f = f/base;
-    r = r + f* (index% base);
+    random += f * (index % base);
     index = index/base;
   }
 
-  return r;
+  return random;
 }
