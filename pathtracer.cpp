@@ -60,8 +60,8 @@ Vector3f PathTracer::tracePixel(int x, int y, const Scene& scene, const Matrix4f
         //        float rand_x = static_cast<float>(x) + (static_cast<float>(rand()) / RAND_MAX); //+ 1.f
         //        float rand_y = static_cast<float>(y) + (static_cast<float>(rand()) / RAND_MAX); // + 1.f
 
-                float rand_x = static_cast<float>(x) + stratifiedSample(g_x+1.f, BASE_X);
-                float rand_y = static_cast<float>(y) + stratifiedSample(g_y+1.f, BASE_Y);
+                float rand_x = static_cast<float>(x) + haltonSequence(g_x + 1.f, BASE_X);
+                float rand_y = static_cast<float>(y) + haltonSequence(g_y + 1.f, BASE_Y);
 
                 Vector3f d((2.f * (rand_x) / m_width) - 1.f, 1.f - (2.f * (rand_y) / m_height), -1.f);
                 d.normalize();
@@ -317,7 +317,7 @@ void PathTracer::toneMap(QRgb *imageData, Vector3f *intensityValues) {
     }
 }
 
-float PathTracer::stratifiedSample(int index, int base){
+float PathTracer::haltonSequence(int index, int base){
   float f = 1.f, random = 0.f;
   while (index > 0){
     f = f/base;

@@ -52,7 +52,7 @@ private:
 
     Vector3f traceRay(const Ray& r, const Scene &scene, int depth);
 
-    float stratifiedSample(int n, int base);
+    float haltonSequence(int n, int base);
 
 };
 
