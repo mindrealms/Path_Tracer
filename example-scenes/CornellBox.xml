@@ -6,12 +6,12 @@
 		<heightangle v="45"/>
 	</cameradata>
 
-	<object type="tree" name="root">
-		<transblock>
-			<translate x="0" y="0" z="0"/>
-			<object type="primitive" name="mesh" filename="models/CornellBox/CornellBox-Sphere.obj">
-			</object>
-		</transblock>
-	</object>
+    <object type="tree" name="root">
+        <transblock>
+            <translate x="0" y="0" z="0"/>
+            <object type="primitive" name="mesh" filename="models/CornellBox/CornellBox-Original_solitude.obj">
+            </object>
+        </transblock>
+    </object>
 
 </scenefile>

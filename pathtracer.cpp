@@ -9,6 +9,8 @@
 
 #include <ctime>
 
+#include <hdrloader/hdrloader.h>
+
 
 
 /* Example code for accessing materials provided by a .mtl file
@@ -39,6 +41,8 @@ void PathTracer::traceScene(QRgb *imageData, const Scene& scene)
             intensityValues[offset] = tracePixel(x, y, scene, invViewMat);
         }
     }
+
+
 
     toneMap(imageData, intensityValues);
 
@@ -76,6 +80,7 @@ Vector3f PathTracer::tracePixel(int x, int y, const Scene& scene, const Matrix4f
     return (out / static_cast<float>(m_samples * GRID_DIM * GRID_DIM)); //average out
 }
 
+
 //Vector3f PathTracer::tracePixel(int x, int y, const Scene& scene, const Matrix4f &invViewMatrix)
 //{
 //    Vector3f p(0, 0, 0); //eye
@@ -104,7 +109,7 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int depth)
     Vector3f L(0.f, 0.f, 0.f);
     float attenuation = 1.f;
 
-    if(scene.getIntersection(ray, &i)) {
+    if (scene.getIntersection(ray, &i)) {
 
         const Mesh * m = static_cast<const Mesh *>(i.object); // mesh intersected
         const Triangle *t = static_cast<const Triangle *>(i.data); // triangle intersected
@@ -154,8 +159,37 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int depth)
         if (depth == 0) { //surface is a luminaire
             L += Vector3f(mat.emission[0], mat.emission[1], mat.emission[2]);
         }
+
+    //no intersection, count light probe contribution to be able to see background environment
+    } else if (depth == 0) {
+
+        float r = (1.f/M_PI) * acos(ray.d[2]) / sqrt(ray.d[0]*ray.d[0] + ray.d[1]*ray.d[1]);
+        Vector2f uv = Vector2f((ray.d[0] * r + 1.f)/2.f, 1.f - (ray.d[1] * r + 1.f)/2.f); //hdr image coordinate in [0,1] with origin top left
+        L += lightProbe(uv);
     }
+
     return L * attenuation;
+}
+
+
+Vector3f PathTracer::lightProbe(Vector2f uv) { //input string here
+
+    HDRLoaderResult result;
+    if (HDRLoader::load("example-scenes/lightprobes/campus_probe.hdr", result)) {
+        float size = result.height * result.width; //img dimensions
+
+        //"resizing" uv according to img dimensions
+        int col = floor(uv[0] * result.width);
+        int row = floor(uv[1] * result.height);
+
+        int index = ((row * result.width) + col) * 3; //3 floats per pixel
+
+        return Vector3f(result.cols[index], result.cols[index+1], result.cols[index+2]);
+
+            //from Ward's http://radsite.lbl.gov/radiance/refer/filefmts.pdf (page 33)
+//            float luminance =  179.f * (0.265f*result.cols[i] + 0.670f*result.cols[i+1] + 0.065f*result.cols[2]);
+    }
+    return Vector3f(0.f, 0.f, 0.f);
 }
 
 
@@ -169,10 +203,6 @@ Vector3f PathTracer::computeBSDF(int mode, const tinyobj::material_t *mat, Ray *
         return Vector3f(mat->specular[0]*k, mat->specular[1]*k, mat->specular[2]*k);
     }
     case MIRROR:
-//    {
-//        float k = 1.f / next_d.dot(normal);
-//        return Vector3f(k, k, k); //Serious note: KKK completely unintentional.
-//    }
     case REFRACTIVE: {
         float k = 1.f / next_d.dot(normal);
         return Vector3f(k, k, k); //Serious note: KKK completely unintentional.
@@ -188,39 +218,49 @@ Vector3f PathTracer::directLighting(const Scene& scene, Vector3f p, Vector3f n, 
 
     std::vector<PathLight> lights = scene.getPathLights();
 
-    int index = rand() % lights.size(); //random light index
-    int r_face = rand() % (lights[index].n_triangles); //random face/triangle
-    std::vector<Vector3f> face = lights[index].faces[r_face]; //1 face (3 points)
+    //scene contains emissive materials (light obects)
+    if (lights.size() != 0) {
+        int index = rand() % lights.size(); //random light index
+        int r_face = rand() % (lights[index].n_triangles); //random face/triangle
+        std::vector<Vector3f> face = lights[index].faces[r_face]; //1 face (3 points)
 
-    //random point on triangle
-    float r_1 = static_cast<float>(rand())/RAND_MAX;
-    float r_2 = static_cast<float>(rand())/RAND_MAX;
-    Vector3f tri_p = (1.f - sqrt(r_1)) * face[0] + (sqrt(r_1) * (1.f - r_2)) * face[1] + (sqrt(r_1) * r_2) * face[2];
-    Vector3f dir = tri_p - p;
+        //random point on triangle
+        float r_1 = static_cast<float>(rand())/RAND_MAX;
+        float r_2 = static_cast<float>(rand())/RAND_MAX;
+        Vector3f tri_p = (1.f - sqrt(r_1)) * face[0] + (sqrt(r_1) * (1.f - r_2)) * face[1] + (sqrt(r_1) * r_2) * face[2];
+        Vector3f dir = tri_p - p;
+//    } else
+        IntersectionInfo i;
+        Ray to_light(p, dir.normalized());
+        if (scene.getIntersection(to_light, &i)) {
 
-    IntersectionInfo i;
-    Ray to_light(p, dir.normalized());
-    if (scene.getIntersection(to_light, &i)) {
+            const Mesh * m = static_cast<const Mesh *>(i.object); // mesh intersected
+            const Triangle *t = static_cast<const Triangle *>(i.data); // triangle intersected
+            const tinyobj::material_t& material = m->getMaterial(t->getIndex()); // material of triangle
 
-        const Mesh * m = static_cast<const Mesh *>(i.object); // mesh intersected
-        const Triangle *t = static_cast<const Triangle *>(i.data); // triangle intersected
-        const tinyobj::material_t& material = m->getMaterial(t->getIndex()); // material of triangle
+            if (checkType(&material) == REFRACTIVE || checkType(&material) == MIRROR) {
+                return Vector3f(0.f, 0.f, 0.f);
+            }
 
-        if (checkType(&material) == REFRACTIVE || checkType(&material) == MIRROR) {
-            return Vector3f(0.f, 0.f, 0.f);
+            //surface is the luminaire
+            if ((i.hit[0] - tri_p[0] < EPSILON) && (i.hit[1] - tri_p[1] < EPSILON) && (i.hit[2] - tri_p[2] < EPSILON)) {
+                Ray from_light(tri_p, (-dir).normalized());
+                Vector3f bsdf = computeBSDF(mode, mat, &from_light, n, -r);
+
+                float o_dot = min(1.f, max(0.f, (dir.normalized()).dot(n))); //object surface dot
+                float l_dot = min(1.f, max(0.f, ((-dir).normalized()).dot(t->getNormal(i).normalized()))); //light surface dot
+
+                return Vector3f((lights[index].emission).array() * bsdf.array() *
+                        o_dot * l_dot * lights[index].area) /  (dir.norm() * dir.norm() * pdf);
+            }
         }
-
-        //surface is the luminaire
-        if ((i.hit[0] - tri_p[0] < EPSILON) && (i.hit[1] - tri_p[1] < EPSILON) && (i.hit[2] - tri_p[2] < EPSILON)) {
-            Ray from_light(tri_p, (-dir).normalized());
-            Vector3f bsdf = computeBSDF(mode, mat, &from_light, n, -r);
-
-            float o_dot = min(1.f, max(0.f, (dir.normalized()).dot(n))); //object surface dot
-            float l_dot = min(1.f, max(0.f, ((-dir).normalized()).dot(t->getNormal(i).normalized()))); //light surface dot
-
-            return Vector3f((lights[index].emission).array() * bsdf.array() *
-                    o_dot * l_dot * lights[index].area) /  (dir.norm() * dir.norm() * pdf);
-        }
+//    } else {
+//        //flip ray direction??? wait, what direction are you using babe???
+//        r = -r;
+//        float comp = (1.f/M_PI) * acos(r[2]) / sqrt(r[0]*r[0] + r[1]*r[1]);
+//         //hdr image coordinate in [0,1] with origin top left
+//        Vector2f uv = Vector2f((r[0] * comp + 1.f)/2.f, 1.f - (r[1] * comp + 1.f)/2.f); //hdr image coordinate in [0,1]
+//        return lightProbe(uv);
     }
 
     return Vector3f(0.f, 0.f, 0.f);

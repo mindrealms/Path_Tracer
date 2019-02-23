@@ -32,7 +32,8 @@ SOURCES += main.cpp \
     scene/basiccamera.cpp \
     util/CS123XmlSceneParser.cpp \
     scene/shape/mesh.cpp \
-    scene/shape/triangle.cpp
+    scene/shape/triangle.cpp \
+    hdrloader/hdrloader.cpp
 
 HEADERS += \
     pathtracer.h \
@@ -354,4 +355,5 @@ HEADERS += \
     Eigen/src/SVD/JacobiSVD_LAPACKE.h \
     Eigen/src/SVD/SVDBase.h \
     Eigen/src/SVD/UpperBidiagonalization.h \
-    Eigen/src/UmfPackSupport/UmfPackSupport.h
+    Eigen/src/UmfPackSupport/UmfPackSupport.h \
+    hdrloader/hdrloader.h
