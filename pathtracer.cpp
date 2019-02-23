@@ -47,55 +47,55 @@ void PathTracer::traceScene(QRgb *imageData, const Scene& scene)
 }
 
 
-//Vector3f PathTracer::tracePixel(int x, int y, const Scene& scene, const Matrix4f &invViewMatrix) {
-//    Vector3f p(0, 0, 0); //eye
-//    Vector3f out(0.f, 0.f, 0.f); //accumulate radiance values over N samples
-
-//    for (int g_x = 0; g_x < GRID_DIM; g_x++) {
-//        for (int g_y = 0; g_y < GRID_DIM; g_y++) {
-
-//            for (int i = 0; i < m_samples; i++) {
-
-//                //random point on (x,y) pixel
-//        //        float rand_x = static_cast<float>(x) + (static_cast<float>(rand()) / RAND_MAX); //+ 1.f
-//        //        float rand_y = static_cast<float>(y) + (static_cast<float>(rand()) / RAND_MAX); // + 1.f
-
-//                float rand_x = static_cast<float>(x) + haltonSequence(g_x + 1.f, BASE_X);
-//                float rand_y = static_cast<float>(y) + haltonSequence(g_y + 1.f, BASE_Y);
-
-//                Vector3f d((2.f * (rand_x) / m_width) - 1.f, 1.f - (2.f * (rand_y) / m_height), -1.f);
-//                d.normalize();
-
-//                Ray r(p, d);
-//                r = r.transform(invViewMatrix);
-//                out += traceRay(r, scene, 0);
-//            }
-//        }
-//    }
-
-//    return (out / static_cast<float>(m_samples * GRID_DIM * GRID_DIM)); //average out
-//}
-
-Vector3f PathTracer::tracePixel(int x, int y, const Scene& scene, const Matrix4f &invViewMatrix)
-{
+Vector3f PathTracer::tracePixel(int x, int y, const Scene& scene, const Matrix4f &invViewMatrix) {
     Vector3f p(0, 0, 0); //eye
     Vector3f out(0.f, 0.f, 0.f); //accumulate radiance values over N samples
 
-    for (int i = 0; i < 100; i++) {
+    for (int g_x = 0; g_x < GRID_DIM; g_x++) {
+        for (int g_y = 0; g_y < GRID_DIM; g_y++) {
 
-        //random point on (x,y) pixel
-        float rand_x = static_cast<float>(x) + (static_cast<float>(rand()) / RAND_MAX) + 1;
-        float rand_y = static_cast<float>(y) + (static_cast<float>(rand()) / RAND_MAX) + 1;
+            for (int i = 0; i < m_samples; i++) {
 
-        Vector3f d((2.f * (rand_x) / m_width) - 1.f, 1.f - (2.f * (rand_y) / m_height), -1);
-        d.normalize();
+                //random point on (x,y) pixel
+        //        float rand_x = static_cast<float>(x) + (static_cast<float>(rand()) / RAND_MAX); //+ 1.f
+        //        float rand_y = static_cast<float>(y) + (static_cast<float>(rand()) / RAND_MAX); // + 1.f
 
-        Ray r(p, d);
-        r = r.transform(invViewMatrix);
-        out += traceRay(r, scene, 0); //traces ray through current pixel
+                float rand_x = static_cast<float>(x) + haltonSequence(g_x + 1.f, BASE_X);
+                float rand_y = static_cast<float>(y) + haltonSequence(g_y + 1.f, BASE_Y);
+
+                Vector3f d((2.f * (rand_x) / m_width) - 1.f, 1.f - (2.f * (rand_y) / m_height), -1.f);
+                d.normalize();
+
+                Ray r(p, d);
+                r = r.transform(invViewMatrix);
+                out += traceRay(r, scene, 0);
+            }
+        }
     }
-    return (out/static_cast<float>(100)); //average out
+
+    return (out / static_cast<float>(m_samples * GRID_DIM * GRID_DIM)); //average out
 }
+
+//Vector3f PathTracer::tracePixel(int x, int y, const Scene& scene, const Matrix4f &invViewMatrix)
+//{
+//    Vector3f p(0, 0, 0); //eye
+//    Vector3f out(0.f, 0.f, 0.f); //accumulate radiance values over N samples
+
+//    for (int i = 0; i < 100; i++) {
+
+//        //random point on (x,y) pixel
+//        float rand_x = static_cast<float>(x) + (static_cast<float>(rand()) / RAND_MAX) + 1;
+//        float rand_y = static_cast<float>(y) + (static_cast<float>(rand()) / RAND_MAX) + 1;
+
+//        Vector3f d((2.f * (rand_x) / m_width) - 1.f, 1.f - (2.f * (rand_y) / m_height), -1);
+//        d.normalize();
+
+//        Ray r(p, d);
+//        r = r.transform(invViewMatrix);
+//        out += traceRay(r, scene, 0); //traces ray through current pixel
+//    }
+//    return (out/static_cast<float>(100)); //average out
+//}
 
 Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int depth)
 {
