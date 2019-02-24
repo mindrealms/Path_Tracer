@@ -1176,7 +1176,8 @@ main.o: main.cpp /Users/marky/Qt5.7.1/5.7/clang_64/lib/QtCore.framework/Headers/
 		util/tiny_obj_loader.h \
 		Eigen/StdVector \
 		Eigen/src/StlSupport/StdVector.h \
-		Eigen/src/StlSupport/details.h
+		Eigen/src/StlSupport/details.h \
+		hdrloader/hdrloader.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o main.o main.cpp
 
 pathtracer.o: pathtracer.cpp pathtracer.h \
@@ -1405,7 +1406,8 @@ pathtracer.o: pathtracer.cpp pathtracer.h \
 		util/tiny_obj_loader.h \
 		Eigen/StdVector \
 		Eigen/src/StlSupport/StdVector.h \
-		Eigen/src/StlSupport/details.h
+		Eigen/src/StlSupport/details.h \
+		hdrloader/hdrloader.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o pathtracer.o pathtracer.cpp
 
 scene.o: scene/scene.cpp scene/scene.h \

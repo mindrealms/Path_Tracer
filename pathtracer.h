@@ -13,7 +13,7 @@
 #define EPSILON 0.0001f       //epsilon term (direct lighting -- to check for light intersection vs occlusion)
 #define BASE_X 2
 #define BASE_Y 3
-#define GRID_DIM 1         //dimension of stratified sampling grid
+#define GRID_DIM 10         //dimension of stratified sampling grid
 
 using namespace Eigen;
 using namespace std;

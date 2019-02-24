@@ -1,8 +1,9 @@
 PATH TRACING README
 
 How to run:
-- standard format of input file, then output file, ** plus number of samples (an integer) **
-[ eg. /mithril.xml /invincible.png 20 ]
+- standard format of input file, then output file, then path of light probe file, number of samples (an integer) **
+[ eg. /mithril.xml /invincible.png /probe/cathedral.hdr 20 ]
+if you’re not using a probe file, just type “none” or whatever other invalid thing you want
 
 Structure of code:
 - traceScene: loops through image pixels and traces rays through them, then tonemaps. Also prints out time time elapsed for render to finish.

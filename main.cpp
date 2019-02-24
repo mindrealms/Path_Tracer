@@ -32,6 +32,11 @@ int main(int argc, char *argv[])
     QString lightprobe = args[2]; //light probe file
     int samples = args[3].toInt();
 
+    if (lightprobe[0].isDigit() == 0) {
+        std::cout << "no probe" << std::endl;
+    }
+
+
     QImage image(IMAGE_WIDTH, IMAGE_HEIGHT, QImage::Format_RGB32);
 
     Scene *scene;

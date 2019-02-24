@@ -225,7 +225,6 @@ Mesh *Scene::loadMesh(std::string filePath, const Affine3f &transform, const std
                 if (_lights.size() != 0) { //if not empty, check if already stored
                     for (unsigned int i=0; i < _lights.size(); i++) {
                         if (_lights[i].id == mat_id) {
-
                             std::vector<Vector3f> triangle = {vertices[face[0]], vertices[face[1]], vertices[face[2]]};
                             _lights[i].faces.push_back(triangle);
                             _lights[i].n_triangles += 1;
