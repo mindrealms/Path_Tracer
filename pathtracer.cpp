@@ -9,8 +9,6 @@
 
 #include <ctime>
 
-#include <hdrloader/hdrloader.h>
-
 
 
 /* Example code for accessing materials provided by a .mtl file
@@ -21,9 +19,11 @@
     const std::string diffuseTex = mat.diffuse_texname; //Diffuse texture name
 */
 
-PathTracer::PathTracer(int width, int height, int samples)
-    : m_width(width), m_height(height), m_samples(samples)
+PathTracer::PathTracer(int width, int height, int samples, QString lightprobe)
+    : m_width(width), m_height(height), m_samples(samples), m_probe(lightprobe),
+      m_success(HDRLoader::load(m_probe.toStdString().c_str(), m_result))
 {
+
 }
 
 void PathTracer::traceScene(QRgb *imageData, const Scene& scene)
@@ -41,8 +41,6 @@ void PathTracer::traceScene(QRgb *imageData, const Scene& scene)
             intensityValues[offset] = tracePixel(x, y, scene, invViewMat);
         }
     }
-
-
 
     toneMap(imageData, intensityValues);
 
@@ -102,23 +100,36 @@ Vector3f PathTracer::tracePixel(int x, int y, const Scene& scene, const Matrix4f
 //    return (out/static_cast<float>(100)); //average out
 //}
 
+
+Vector3f PathTracer::sampleTexture(Vector2f uvs, const tinyobj::material_t& mat) {
+    QImage tex_map = QImage(mat.diffuse_texname.data()); //move this outside dont load every time!!!!
+    if (tex_map.isNull()) {
+        std::cout << "ooppps" << std::endl;
+    }
+
+    QRgb qcol = tex_map.pixel(QPoint(uvs[0]*tex_map.width(), uvs[1]*tex_map.height()));
+    return Vector3f(qRed(qcol)/255.f, qGreen(qcol)/255.f, qBlue(qcol)/255.f);
+}
+
 Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int depth)
 {
     IntersectionInfo i;
     Ray ray(r);
     Vector3f L(0.f, 0.f, 0.f);
     float attenuation = 1.f;
+    Vector3f tex_color(1.f, 1.f, 1.f);
 
     if (scene.getIntersection(ray, &i)) {
 
         const Mesh * m = static_cast<const Mesh *>(i.object); // mesh intersected
         const Triangle *t = static_cast<const Triangle *>(i.data); // triangle intersected
         const tinyobj::material_t& mat = m->getMaterial(t->getIndex()); // material of triangle
-
         int mode = checkType(&mat);
         Vector3f normal = t->getNormal(i).normalized();
         Vector4f sample = sampleNextDir(m->getMaterial(t->getIndex()).ior, ray, normal, &mode);
         Vector3f next_d = sample.head<3>();
+        Vector2f uvs = m->getUV(t->getIndex());
+//        tex_color = sampleTexture(uvs, mat);
 
         if (mode == REFRACTIVE) {
             float distance = 10.f * (i.hit - ray.o).norm(); //mult by 10 bc units are too small so virtual distance is < 1 unit
@@ -127,7 +138,7 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int depth)
         }
 
         L += Vector3f(directLighting(scene, i.hit, normal, mode, ray.d, sample[3], &mat).array() *
-                Vector3f(mat.ambient[0], mat.ambient[1], mat.ambient[2]).array());
+                Vector3f(mat.ambient[0], mat.ambient[1], mat.ambient[2]).array() * tex_color.array());
 
         //bsdf computation
         Vector3f bsdf = computeBSDF(mode, &mat, &ray, normal, next_d);
@@ -160,34 +171,36 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int depth)
             L += Vector3f(mat.emission[0], mat.emission[1], mat.emission[2]);
         }
 
-    //no intersection, count light probe contribution to be able to see background environment
-    } else if (depth == 0) {
-
-        float r = (1.f/M_PI) * acos(ray.d[2]) / sqrt(ray.d[0]*ray.d[0] + ray.d[1]*ray.d[1]);
-        Vector2f uv = Vector2f((ray.d[0] * r + 1.f)/2.f, 1.f - (ray.d[1] * r + 1.f)/2.f); //hdr image coordinate in [0,1] with origin top left
-        L += lightProbe(uv);
+    //no intersection
+    } else  {
+        if (depth == 0) { //count light probe contribution to be able to see background environment
+            L += lightProbe(ray.d);
+        }
     }
 
     return L * attenuation;
 }
 
 
-Vector3f PathTracer::lightProbe(Vector2f uv) { //input string here
+Vector3f PathTracer::lightProbe(Vector3f d) {
 
-    HDRLoaderResult result;
-    if (HDRLoader::load("example-scenes/lightprobes/campus_probe.hdr", result)) {
-        float size = result.height * result.width; //img dimensions
+//    HDRLoaderResult result;
+    if (m_success) {
+        float size = m_result.height * m_result.width; //img dimensions
+
+        float r = (1.f/M_PI) * acos(d[2]) / sqrt(d[0]*d[0] + d[1]*d[1]);
+        Vector2f uv = Vector2f((d[0] * r + 1.f)/2.f, 1.f - (d[1] * r + 1.f)/2.f); //hdr image coordinate in [0,1] with origin top left
 
         //"resizing" uv according to img dimensions
-        int col = floor(uv[0] * result.width);
-        int row = floor(uv[1] * result.height);
+        int col = floor(uv[0] * m_result.width);
+        int row = floor(uv[1] * m_result.height);
 
-        int index = ((row * result.width) + col) * 3; //3 floats per pixel
+        int index = ((row * m_result.width) + col) * 3; //3 floats per pixel
 
-        return Vector3f(result.cols[index], result.cols[index+1], result.cols[index+2]);
+        return Vector3f(m_result.cols[index], m_result.cols[index+1], m_result.cols[index+2]);
 
-            //from Ward's http://radsite.lbl.gov/radiance/refer/filefmts.pdf (page 33)
-//            float luminance =  179.f * (0.265f*result.cols[i] + 0.670f*result.cols[i+1] + 0.065f*result.cols[2]);
+//       from Ward's http://radsite.lbl.gov/radiance/refer/filefmts.pdf (page 33) -- NO THIS IS IRRELEVANT
+//       float luminance =  179.f * (0.265f*result.cols[i] + 0.670f*result.cols[i+1] + 0.065f*result.cols[2]);
     }
     return Vector3f(0.f, 0.f, 0.f);
 }
@@ -229,7 +242,7 @@ Vector3f PathTracer::directLighting(const Scene& scene, Vector3f p, Vector3f n, 
         float r_2 = static_cast<float>(rand())/RAND_MAX;
         Vector3f tri_p = (1.f - sqrt(r_1)) * face[0] + (sqrt(r_1) * (1.f - r_2)) * face[1] + (sqrt(r_1) * r_2) * face[2];
         Vector3f dir = tri_p - p;
-//    } else
+
         IntersectionInfo i;
         Ray to_light(p, dir.normalized());
         if (scene.getIntersection(to_light, &i)) {
@@ -254,13 +267,24 @@ Vector3f PathTracer::directLighting(const Scene& scene, Vector3f p, Vector3f n, 
                         o_dot * l_dot * lights[index].area) /  (dir.norm() * dir.norm() * pdf);
             }
         }
-//    } else {
-//        //flip ray direction??? wait, what direction are you using babe???
-//        r = -r;
-//        float comp = (1.f/M_PI) * acos(r[2]) / sqrt(r[0]*r[0] + r[1]*r[1]);
-//         //hdr image coordinate in [0,1] with origin top left
-//        Vector2f uv = Vector2f((r[0] * comp + 1.f)/2.f, 1.f - (r[1] * comp + 1.f)/2.f); //hdr image coordinate in [0,1]
-//        return lightProbe(uv);
+    } else {
+
+        Vector4f sample = sampleNextDir(mat->ior, Ray(Vector3f(0.f, 0.f,0.f), r), n, &mode);
+        Vector3f next_d = sample.head<3>();
+        if (checkType(mat) == REFRACTIVE) { //works
+            return Vector3f(0.f, 0.f, 0.f);
+        }
+        if (checkType(mat) == MIRROR) { //works
+            IntersectionInfo i;
+            Ray to_void(p, next_d.normalized());
+            if (!(scene.getIntersection(to_void, &i))) {
+                Ray from_void(to_void.d, -next_d.normalized());
+                Vector3f bsdf = computeBSDF(mode, mat, &from_void, n, -r);
+                float o_dot = min(1.f, max(0.f, (next_d.normalized()).dot(n))); //object surface dot
+                return Vector3f(lightProbe(r).array() * bsdf.array() *
+                        o_dot) /  (next_d.norm() * next_d.norm() * pdf);
+            }
+        }
     }
 
     return Vector3f(0.f, 0.f, 0.f);

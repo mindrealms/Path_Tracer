@@ -6,6 +6,8 @@
 
 #include "scene/scene.h"
 
+#include <hdrloader/hdrloader.h>
+
 #define START_P 0.8f        //initial (stop) probability (for the first 5 bounces)
 #define CLAMP_P 0.7f        //stop probability for > 5 bounces (edit later maybe???? is it too high?)
 #define EPSILON 0.0001f       //epsilon term (direct lighting -- to check for light intersection vs occlusion)
@@ -27,18 +29,23 @@ enum MODE {
 class PathTracer
 {
 public:
-    PathTracer(int width, int height, int samples);
+    PathTracer(int width, int height, int samples, QString lightprobe);
 
     void traceScene(QRgb *imageData, const Scene &scene);
 
 private:
     int m_width, m_height, m_samples;
+    QString m_probe;
+    HDRLoaderResult m_result;
+    bool m_success;
+
+    Vector3f sampleTexture(Vector2f uvs, const tinyobj::material_t& mat);
 
     void toneMap(QRgb *imageData, Vector3f *intensityValues);
 
     int checkType(const tinyobj::material_t *mat);
 
-    Vector3f lightProbe(Vector2f uv);
+    Vector3f lightProbe(Vector3f d);
 
     Vector4f sampleNextDir(tinyobj::real_t ior, Ray ray, Vector3f normal, int *mode);
 
