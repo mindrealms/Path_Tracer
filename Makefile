@@ -13,9 +13,9 @@ MAKEFILE      = Makefile
 CC            = /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang
 CXX           = /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++
 DEFINES       = -DQT_DEPRECATED_WARNINGS -DQT_NO_DEBUG -DQT_GUI_LIB -DQT_XML_LIB -DQT_CORE_LIB
-CFLAGS        = -pipe -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.12.sdk -mmacosx-version-min=10.8 -O2 -Wall -W -fPIC $(DEFINES)
-CXXFLAGS      = -pipe -stdlib=libc++ -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.12.sdk -mmacosx-version-min=10.8 -msse2 -stdlib=libc++ -O2 -std=gnu++11 -Wall -W -fPIC $(DEFINES)
-INCPATH       = -I. -I/Users/marky/Qt5.7.1/5.7/clang_64/lib/QtGui.framework/Headers -I/Users/marky/Qt5.7.1/5.7/clang_64/lib/QtXml.framework/Headers -I/Users/marky/Qt5.7.1/5.7/clang_64/lib/QtCore.framework/Headers -I. -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.12.sdk/System/Library/Frameworks/OpenGL.framework/Headers -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.12.sdk/System/Library/Frameworks/AGL.framework/Headers -I/Users/marky/Qt5.7.1/5.7/clang_64/mkspecs/macx-clang -F/Users/marky/Qt5.7.1/5.7/clang_64/lib
+CFLAGS        = -pipe -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.15.sdk -mmacosx-version-min=10.8 -O2 -Wall -W -fPIC $(DEFINES)
+CXXFLAGS      = -pipe -stdlib=libc++ -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.15.sdk -mmacosx-version-min=10.8 -msse2 -stdlib=libc++ -O2 -std=gnu++11 -Wall -W -fPIC $(DEFINES)
+INCPATH       = -I. -I/Users/marky/Qt5.7.1/5.7/clang_64/lib/QtGui.framework/Headers -I/Users/marky/Qt5.7.1/5.7/clang_64/lib/QtXml.framework/Headers -I/Users/marky/Qt5.7.1/5.7/clang_64/lib/QtCore.framework/Headers -I. -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.15.sdk/System/Library/Frameworks/OpenGL.framework/Headers -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.15.sdk/System/Library/Frameworks/AGL.framework/Headers -I/Users/marky/Qt5.7.1/5.7/clang_64/mkspecs/macx-clang -F/Users/marky/Qt5.7.1/5.7/clang_64/lib
 QMAKE         = /Users/marky/Qt5.7.1/5.7/clang_64/bin/qmake
 DEL_FILE      = rm -f
 CHK_DIR_EXISTS= test -d
@@ -35,7 +35,7 @@ COMPRESS      = gzip -9f
 DISTNAME      = path-stencil1.0.0
 DISTDIR = /Users/marky/Desktop/CS224/class_mat/Assignments/2_path_tracing/path/Path-Stencil/.tmp/path-stencil1.0.0
 LINK          = /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++
-LFLAGS        = -headerpad_max_install_names -stdlib=libc++ -Wl,-syslibroot,/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.12.sdk -mmacosx-version-min=10.8 -stdlib=libc++ -Wl,-rpath,/Users/marky/Qt5.7.1/5.7/clang_64/lib
+LFLAGS        = -headerpad_max_install_names -stdlib=libc++ -Wl,-syslibroot,/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.15.sdk -mmacosx-version-min=10.8 -stdlib=libc++ -Wl,-rpath,/Users/marky/Qt5.7.1/5.7/clang_64/lib
 LIBS          = $(SUBLIBS) -F/Users/marky/Qt5.7.1/5.7/clang_64/lib -framework QtGui -framework QtCore -framework DiskArbitration -framework IOKit -framework QtXml -framework OpenGL -framework AGL 
 AR            = /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ar cq
 RANLIB        = /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ranlib -s

@@ -78,33 +78,10 @@ Vector3f PathTracer::tracePixel(int x, int y, const Scene& scene, const Matrix4f
     return (out / static_cast<float>(m_samples * GRID_DIM * GRID_DIM)); //average out
 }
 
-
-//Vector3f PathTracer::tracePixel(int x, int y, const Scene& scene, const Matrix4f &invViewMatrix)
-//{
-//    Vector3f p(0, 0, 0); //eye
-//    Vector3f out(0.f, 0.f, 0.f); //accumulate radiance values over N samples
-
-//    for (int i = 0; i < 100; i++) {
-
-//        //random point on (x,y) pixel
-//        float rand_x = static_cast<float>(x) + (static_cast<float>(rand()) / RAND_MAX) + 1;
-//        float rand_y = static_cast<float>(y) + (static_cast<float>(rand()) / RAND_MAX) + 1;
-
-//        Vector3f d((2.f * (rand_x) / m_width) - 1.f, 1.f - (2.f * (rand_y) / m_height), -1);
-//        d.normalize();
-
-//        Ray r(p, d);
-//        r = r.transform(invViewMatrix);
-//        out += traceRay(r, scene, 0); //traces ray through current pixel
-//    }
-//    return (out/static_cast<float>(100)); //average out
-//}
-
-
 Vector3f PathTracer::sampleTexture(Vector2f uvs, const tinyobj::material_t& mat) {
     QImage tex_map = QImage(mat.diffuse_texname.data()); //move this outside dont load every time!!!!
     if (tex_map.isNull()) {
-        std::cout << "ooppps" << std::endl;
+        std::cout << "Texture map file is invalid." << std::endl;
     }
 
     QRgb qcol = tex_map.pixel(QPoint(uvs[0]*tex_map.width(), uvs[1]*tex_map.height()));
@@ -126,26 +103,21 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int depth)
         const tinyobj::material_t& mat = m->getMaterial(t->getIndex()); // material of triangle
         int mode = checkType(&mat);
         Vector3f normal = t->getNormal(i).normalized();
-        Vector4f sample = sampleNextDir(m->getMaterial(t->getIndex()).ior, ray, normal, &mode);
+        Vector4f sample = sampleNextDir(m->getMaterial(t->getIndex()).ior, ray, i.hit, normal, &mode);
         Vector3f next_d = sample.head<3>();
 //        Vector2f uvs = m->getUV(t->getIndex());
 //        tex_color = sampleTexture(uvs, mat);
 
-        if (mode == REFRACTIVE) {
-            float distance = 10.f * (i.hit - ray.o).norm(); //mult by 10 bc units are too small so virtual distance is < 1 unit
-            attenuation = (1.f / min(1.f, (distance)));
-            L += Vector3f(mat.transmittance[0],mat.transmittance[1],mat.transmittance[2]);
-        }
-
+        //direct lighting computation                                 //sample[3] = pdf
         L += Vector3f(directLighting(scene, i.hit, normal, mode, ray.d, sample[3], &mat).array() *
-                Vector3f(mat.ambient[0], mat.ambient[1], mat.ambient[2]).array()); // * tex_color.array()
+                Vector3f(mat.ambient[0], mat.ambient[1], mat.ambient[2]).array());
 
         //bsdf computation
-        Vector3f bsdf = computeBSDF(mode, &mat, &ray, normal, next_d);
+        Vector3f bsdf = computeBXDF(mode, &mat, &ray, normal, next_d);
 
         float pdf_rr; //russian roulette - continue probability
         switch(static_cast<int>(depth < 5)) {
-        case 0: //bounce past 5th: continue p weighed according to bsdf but clamped above 0.7 (else it was speckly)
+        case 0: //bounce past 5th: continue p weighed according to bsdf
             pdf_rr = bsdf.norm();
             break;
         default: //first 5 (non-mirror) bounces, 80% continue prob
@@ -153,14 +125,15 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int depth)
             break;
         }
 
+        //indirect lighting
         if (static_cast<float>(rand())/RAND_MAX < pdf_rr) {
             Ray new_dir(i.hit, next_d);
             float dot = (new_dir.d).dot(normal);
-            float denom = sample[3] * pdf_rr;
+            float denom = pdf_rr * sample[3]; // --------->>>>>>>>>> (1/(2*M_PI)) ??
 
             Vector3f radiance;
             if (mode == MIRROR || mode == REFRACTIVE) {
-                radiance = traceRay(new_dir, scene, 0);
+                radiance = traceRay(new_dir, scene, 0); // STUPID ASS BUG YOU RIPPED MY SOUL OUT BUT I FOUND YA
             } else  {
                 radiance = traceRay(new_dir, scene, depth + 1);
             }
@@ -174,12 +147,13 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int depth)
     //no intersection, check if we have a light probe
     } else if (m_success) {
 
-        if (depth == 0) { //count probe contribution to be able to see background environment
+        //count probe contribution to be able to see background environment
+        if (depth == 0) {
             L += lightProbe(ray.d);
         }
     }
 
-    return L * attenuation;
+    return L;
 }
 
 
@@ -198,15 +172,12 @@ Vector3f PathTracer::lightProbe(Vector3f d) {
         int index = ((row * m_result.width) + col) * 3; //3 floats per pixel
 
         return Vector3f(m_result.cols[index], m_result.cols[index+1], m_result.cols[index+2]);
-
-//       from Ward's http://radsite.lbl.gov/radiance/refer/filefmts.pdf (page 33) -- NO THIS IS IRRELEVANT
-//       float luminance =  179.f * (0.265f*result.cols[i] + 0.670f*result.cols[i+1] + 0.065f*result.cols[2]);
     }
     return Vector3f(0.f, 0.f, 0.f);
 }
 
 
-Vector3f PathTracer::computeBSDF(int mode, const tinyobj::material_t *mat, Ray *ray, Vector3f normal, Vector3f next_d) {
+Vector3f PathTracer::computeBXDF(int mode, const tinyobj::material_t *mat, Ray *ray, Vector3f normal, Vector3f next_d) {
     switch(mode) {
     case DIFFUSE: {
         return Vector3f(mat->diffuse[0]/M_PI, mat->diffuse[1]/M_PI, mat->diffuse[2]/M_PI);
@@ -235,6 +206,8 @@ Vector3f PathTracer::directLighting(const Scene& scene, Vector3f p, Vector3f n, 
     if (lights.size() != 0) {
 
         int index = rand() % lights.size(); //random light index
+
+        //select triangles weighted by area
         int r_face = rand() % (lights[index].n_triangles); //random face/triangle
         std::vector<Vector3f> face = lights[index].faces[r_face]; //1 face (3 points)
 
@@ -243,13 +216,6 @@ Vector3f PathTracer::directLighting(const Scene& scene, Vector3f p, Vector3f n, 
         float r_2 = static_cast<float>(rand())/RAND_MAX;
         Vector3f tri_p = (1.f - sqrt(r_1)) * face[0] + (sqrt(r_1) * (1.f - r_2)) * face[1] + (sqrt(r_1) * r_2) * face[2];
         Vector3f dir = tri_p - p;
-
-        if (checkType(mat) == GLOSSY) {
-            std::cout << "gloss" << std::endl;
-        }
-        if (checkType(mat) == DIFFUSE) {
-            std::cout << "diffff" << std::endl;
-        }
 
         IntersectionInfo i;
         Ray to_light(p, dir.normalized());
@@ -263,11 +229,10 @@ Vector3f PathTracer::directLighting(const Scene& scene, Vector3f p, Vector3f n, 
                 return Vector3f(0.f, 0.f, 0.f);
             }
 
-
             //surface is the luminaire
             if ((i.hit[0] - tri_p[0] < EPSILON) && (i.hit[1] - tri_p[1] < EPSILON) && (i.hit[2] - tri_p[2] < EPSILON)) {
                 Ray from_light(tri_p, (-dir).normalized());
-                Vector3f bsdf = computeBSDF(mode, mat, &from_light, n, -r);
+                Vector3f bsdf = computeBXDF(mode, mat, &from_light, n, -r);
 
                 float o_dot = min(1.f, max(0.f, (dir.normalized()).dot(n))); //object surface dot
                 float l_dot = min(1.f, max(0.f, ((-dir).normalized()).dot(t->getNormal(i).normalized()))); //light surface dot
@@ -278,32 +243,25 @@ Vector3f PathTracer::directLighting(const Scene& scene, Vector3f p, Vector3f n, 
         }
 
     } else if (m_success) { //light probe is light source
-
-        Vector4f sample = sampleNextDir(mat->ior, Ray(Vector3f(0.f, 0.f,0.f), r), n, &mode);
+                                                                                    //??
+//        Vector4f sample = sampleNextDir(mat->ior, Ray(Vector3f(0.f,0.f,0.f), r), Vector3f(0.f,0.f,0.f), n, &mode);
+        Vector4f sample = sampleNextDir(mat->ior, Ray(p, r.normalized()), p, n, &mode);
         Vector3f next_d = sample.head<3>();
 //        if (checkType(mat) == REFRACTIVE) { //no???????
 //            return Vector3f(0.f, 0.f, 0.f);
 //        }
-        if (checkType(mat) == MIRROR) { //works
+//        if (checkType(mat) == MIRROR) {
             IntersectionInfo i;
             Ray to_void(p, next_d.normalized());
             if (!(scene.getIntersection(to_void, &i))) {
                 Ray from_void(to_void.d, -next_d.normalized());
-                Vector3f bsdf = computeBSDF(mode, mat, &from_void, n, -r);
+//                Vector3f bsdf = computeBXDF(mode, mat, &from_void, n, -r);
+                Vector3f bsdf = computeBXDF(mode, mat, &from_void, n, next_d);
+
                 float o_dot = min(1.f, max(0.f, (next_d.normalized()).dot(n)));
-                return Vector3f(lightProbe(r).array() * bsdf.array() *
+
+                return Vector3f(lightProbe(next_d).array() * bsdf.array() *
                         o_dot) /  (next_d.norm() * next_d.norm() * pdf);
-            }
-//        }
-//            {
-//            IntersectionInfo i;
-//            Ray to_void(p, next_d.normalized());
-//            if (!(scene.getIntersection(to_void, &i))) {
-//                Ray from_void(to_void.d, -next_d.normalized());
-//                Vector3f bsdf = computeBSDF(mode, mat, &from_void, n, -r);
-//                float o_dot = min(1.f, max(0.f, (next_d.normalized()).dot(n))); //object surface dot
-//                return Vector3f(lightProbe(r).array() * bsdf.array() *
-//                        o_dot * Vector3f(mat->specular[0], mat->specular[1], mat->specular[2]).array()) /  (next_d.norm() * next_d.norm() * pdf);
 //            }
         }
     }
@@ -313,7 +271,7 @@ Vector3f PathTracer::directLighting(const Scene& scene, Vector3f p, Vector3f n, 
 
 
 /* returns Vector4f, where .xyz = outoing direction vector w_o, and .w = pdf float value */
-Vector4f PathTracer::sampleNextDir(tinyobj::real_t ior, Ray ray, Vector3f normal, int *mode) {
+Vector4f PathTracer::sampleNextDir(tinyobj::real_t ior, Ray ray, Vector3f p, Vector3f normal, int *mode) {
 
     Vector3f w_o(0.f, 0.f, 0.f);
     float phi, pdf = 0.f;
@@ -348,7 +306,7 @@ Vector4f PathTracer::sampleNextDir(tinyobj::real_t ior, Ray ray, Vector3f normal
         break; }
     case REFRACTIVE: {
         pdf = 1.f;
-        w_o = getRefractVec(ray.d, normal, ior, mode).normalized();
+        w_o = getRefractVec(ray, p, normal, ior, mode).normalized();
         break; }
     }
 
@@ -360,9 +318,9 @@ Vector3f PathTracer::getMirrorVec(Vector3f d, Vector3f normal) {
     return (2.f * d.dot(normal) * normal - d).normalized();
 }
 
-Vector3f PathTracer::getRefractVec(Vector3f d, Vector3f &normal, tinyobj::real_t ior, int *mode) { //, float *pdf, int *mode
+Vector3f PathTracer::getRefractVec(Ray ray, Vector3f p, Vector3f &normal, tinyobj::real_t ior, int *mode) { //, float *pdf, int *mode
 
-    float cos_i = max(-1.f, min(1.f, d.dot(normal)));
+    float cos_i = max(-1.f, min(1.f, ray.d.dot(normal)));
     float n_i = 1.f, n_t = ior;
 
     if (cos_i < 0) { //out -> in
@@ -378,12 +336,17 @@ Vector3f PathTracer::getRefractVec(Vector3f d, Vector3f &normal, tinyobj::real_t
 
     if (k < 0.f) {
         *mode = MIRROR;
-        return getMirrorVec(d, -normal); //total internal reflection
+        return getMirrorVec(ray.d, -normal); //total internal reflection
     } else if (static_cast<float>(rand())/RAND_MAX < schlick) {
         *mode = MIRROR;
-        return getMirrorVec(-d, normal); //ideal reflection
+        return getMirrorVec(-ray.d, normal); //ideal reflection
     }
-    return (((n_i/n_t) * d + ((n_i/n_t)*cos_i - sqrt(k)) * normal)); //refraction
+
+    //set up attenuation (only when the ray goes inside the new medium)
+    float distance = 10.f * (p - ray.o).norm(); //mult by 10 bc units are too small so virtual distance is < 1 unit
+    float attenuation = (1.f / min(1.f, (distance)));
+
+    return (((n_i/n_t) * ray.d + ((n_i/n_t)*cos_i - sqrt(k)) * normal)) * attenuation; //refraction (snell)
 }
 
 

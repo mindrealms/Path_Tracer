@@ -261,13 +261,18 @@ Mesh *Scene::loadMesh(std::string filePath, const Affine3f &transform, const std
             for (int v=0; v<3; v++) {
                 ctr += (_lights[i].faces[tri])[v]; //all vertices
             }
-            ctr /= 3.0f; //centroid? hm? to pio vary kentro olwn twn varewn kentrwn ha. ha. asteiatoras.
+            ctr /= 3.0f; //centroid
             avg += ctr;
 
-            Vector3f AB = _lights[i].faces[tri][1] - _lights[i].faces[tri][0];
-            Vector3f AC = _lights[i].faces[tri][2] - _lights[i].faces[tri][0];
+            //Heron's formula for area of arbitrary triangle
+            float AB = (_lights[i].faces[tri][1] - _lights[i].faces[tri][0]).norm();
+            float AC = (_lights[i].faces[tri][2] - _lights[i].faces[tri][0]).norm();
+            float BC = (_lights[i].faces[tri][2] - _lights[i].faces[tri][1]).norm();
 
-            _lights[i].area = (AB.cross(AC)).norm() / 2.f; //for now only since all are the same (area of 1 triangle)
+            float s = (AB + AC + BC)*0.5f;
+            _lights[i].area += sqrt(s*(s-AB)*(s-AC)*(s-BC)); //accumulating area of entire light
+
+//            _lights[i].area = (AB.cross(AC)).norm() / 2.f; //for now only since all are the same (area of 1 triangle)
 
         }
         _lights[i].avg_pos = avg / _lights[i].n_triangles;
