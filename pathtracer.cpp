@@ -107,9 +107,9 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int depth)
 //        Vector2f uvs = m->getUV(t->getIndex());
 //        tex_color = sampleTexture(uvs, mat);
 
-        //direct lighting computation                                 //sample[3] = pdf
-        L += Vector3f(directLighting(scene, i.hit, normal, mode, ray.d, sample[3], &mat).array() *
-                Vector3f(mat.ambient[0], mat.ambient[1], mat.ambient[2]).array());
+        //direct lighting computation
+                                                                      //sample[3] = pdf
+        L += Vector3f(directLighting(scene, i.hit, normal, mode, ray.d, sample[3], &mat).array());
 
         //bsdf computation
         Vector3f bsdf = computeBXDF(mode, &mat, &ray, normal, next_d);
@@ -125,20 +125,20 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int depth)
         }
 
         //indirect lighting
-        if (static_cast<float>(rand())/RAND_MAX < pdf_rr) {
-            Ray new_dir(i.hit, next_d);
-            float dot = (new_dir.d).dot(normal);
-            float denom = pdf_rr * sample[3]; // --------->>>>>>>>>> (1/(2*M_PI)) ??
+//        if (static_cast<float>(rand())/RAND_MAX < pdf_rr) {
+//            Ray new_dir(i.hit, next_d);
+//            float dot = (new_dir.d).dot(normal);
+//            float denom = pdf_rr * sample[3]; // --------->>>>>>>>>> (1/(2*M_PI)) ??
 
-            Vector3f radiance;
-            if (mode == MIRROR || mode == REFRACTIVE) {
-                radiance = traceRay(new_dir, scene, 0); // STUPID ASS BUG YOU RIPPED MY SOUL OUT BUT I FOUND YA
-            } else  {
-                radiance = traceRay(new_dir, scene, depth + 1);
-            }
+//            Vector3f radiance;
+//            if (mode == MIRROR || mode == REFRACTIVE) {
+//                radiance = traceRay(new_dir, scene, 0); // STUPID ASS BUG YOU RIPPED MY SOUL OUT BUT I FOUND YA
+//            } else  {
+//                radiance = traceRay(new_dir, scene, depth + 1);
+//            }
 
-            L += (Vector3f(radiance.array() * bsdf.array()) * dot) / denom;
-        }
+//            L += (Vector3f(radiance.array() * bsdf.array()) * dot) / denom;
+//        }
         if (depth == 0) { //surface is a luminaire
             L += Vector3f(mat.emission[0], mat.emission[1], mat.emission[2]);
         }
@@ -224,8 +224,8 @@ Vector3f PathTracer::directLighting(const Scene& scene, Vector3f p, Vector3f n, 
             const Triangle *t = static_cast<const Triangle *>(i.data); // triangle intersected
             const tinyobj::material_t& material = m->getMaterial(t->getIndex()); // material of triangle
 
-            int type = checkType(&material);
-            if (type== REFRACTIVE || type == MIRROR) {
+            int mode = checkType(&material);
+            if (mode == REFRACTIVE || mode == MIRROR) {
                 return Vector3f(0.f, 0.f, 0.f);
             }
 
