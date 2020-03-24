@@ -107,9 +107,10 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int depth)
 //        Vector2f uvs = m->getUV(t->getIndex());
 //        tex_color = sampleTexture(uvs, mat);
 
-        //direct lighting computation
-                                                                      //sample[3] = pdf
-        L += Vector3f(directLighting(scene, i.hit, normal, mode, ray.d, sample[3], &mat).array());
+        //direct lighting computation                                 //sample[3] = pdf
+        if (mode != REFRACTIVE && mode != MIRROR) {
+            L += Vector3f(directLighting(scene, i.hit, normal, mode, ray.d, sample[3], &mat).array());
+        }
 
         //bsdf computation
         Vector3f bsdf = computeBXDF(mode, &mat, &ray, normal, next_d);
@@ -125,20 +126,20 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int depth)
         }
 
         //indirect lighting
-//        if (static_cast<float>(rand())/RAND_MAX < pdf_rr) {
-//            Ray new_dir(i.hit, next_d);
-//            float dot = (new_dir.d).dot(normal);
-//            float denom = pdf_rr * sample[3]; // --------->>>>>>>>>> (1/(2*M_PI)) ??
+        if (static_cast<float>(rand())/RAND_MAX < pdf_rr) {
+            Ray new_dir(i.hit, next_d);
+            float dot = (new_dir.d).dot(normal); //already normalized
+            float denom = pdf_rr * (1/(2*M_PI)); // --------->>>>>>>>>> ??
 
-//            Vector3f radiance;
-//            if (mode == MIRROR || mode == REFRACTIVE) {
-//                radiance = traceRay(new_dir, scene, 0); // STUPID ASS BUG YOU RIPPED MY SOUL OUT BUT I FOUND YA
-//            } else  {
-//                radiance = traceRay(new_dir, scene, depth + 1);
-//            }
+            Vector3f radiance;
+            if (mode == MIRROR || mode == REFRACTIVE) {
+                radiance = traceRay(new_dir, scene, 0); // STUPID ASS BUG YOU RIPPED MY SOUL OUT BUT I FOUND YA
+            } else  {
+                radiance = traceRay(new_dir, scene, depth + 1);
+            }
 
-//            L += (Vector3f(radiance.array() * bsdf.array()) * dot) / denom;
-//        }
+            L += (Vector3f(radiance.array() * bsdf.array()) * dot) / denom;
+        }
         if (depth == 0) { //surface is a luminaire
             L += Vector3f(mat.emission[0], mat.emission[1], mat.emission[2]);
         }
@@ -159,7 +160,6 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int depth)
 Vector3f PathTracer::lightProbe(Vector3f d) {
 
     if (m_success) {
-//        float size = m_result.height * m_result.width; //img dimensions
 
         float r = (1.f/M_PI) * acos(d[2]) / sqrt(d[0]*d[0] + d[1]*d[1]);
         Vector2f uv = Vector2f((d[0] * r + 1.f)/2.f, 1.f - (d[1] * r + 1.f)/2.f); //hdr image coordinate in [0,1] with origin top left
@@ -201,7 +201,7 @@ Vector3f PathTracer::directLighting(const Scene& scene, Vector3f p, Vector3f n, 
 
     std::vector<PathLight> lights = scene.getPathLights();
 
-    //scene contains emissive materials (light obects)
+    //scene contains emissive materials (light objects)
     if (lights.size() != 0) {
 
         int index = rand() % lights.size(); //random light index
@@ -222,12 +222,12 @@ Vector3f PathTracer::directLighting(const Scene& scene, Vector3f p, Vector3f n, 
 
             const Mesh * m = static_cast<const Mesh *>(i.object); // mesh intersected
             const Triangle *t = static_cast<const Triangle *>(i.data); // triangle intersected
-            const tinyobj::material_t& material = m->getMaterial(t->getIndex()); // material of triangle
+//            const tinyobj::material_t& material = m->getMaterial(t->getIndex()); // material of triangle
 
-            int mode = checkType(&material);
-            if (mode == REFRACTIVE || mode == MIRROR) {
-                return Vector3f(0.f, 0.f, 0.f);
-            }
+//            int type = checkType(&material);
+//            if (type == REFRACTIVE || type == MIRROR) {
+//                return Vector3f(0.f, 0.f, 0.f);
+//            }
 
             //surface is the luminaire
             if ((i.hit[0] - tri_p[0] < EPSILON) && (i.hit[1] - tri_p[1] < EPSILON) && (i.hit[2] - tri_p[2] < EPSILON)) {
