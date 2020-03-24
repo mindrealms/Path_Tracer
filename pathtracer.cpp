@@ -93,7 +93,6 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int depth)
     IntersectionInfo i;
     Ray ray(r);
     Vector3f L(0.f, 0.f, 0.f);
-    float attenuation = 1.f;
 //    Vector3f tex_color(1.f, 1.f, 1.f);
 
     if (scene.getIntersection(ray, &i)) {
@@ -225,7 +224,8 @@ Vector3f PathTracer::directLighting(const Scene& scene, Vector3f p, Vector3f n, 
             const Triangle *t = static_cast<const Triangle *>(i.data); // triangle intersected
             const tinyobj::material_t& material = m->getMaterial(t->getIndex()); // material of triangle
 
-            if (checkType(&material) == REFRACTIVE || checkType(&material) == MIRROR) {
+            int type = checkType(&material);
+            if (type== REFRACTIVE || type == MIRROR) {
                 return Vector3f(0.f, 0.f, 0.f);
             }
 
