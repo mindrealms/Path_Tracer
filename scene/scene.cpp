@@ -18,6 +18,7 @@
 using namespace Eigen;
 
 static std::vector<PathLight> _lights = std::vector<PathLight>();
+static std::vector<QImage> _texmaps = std::vector<QImage>();
 
 Scene::Scene()
 {
@@ -327,6 +328,10 @@ void Scene::addPathLight(const PathLight &l) {
 
 std::vector<PathLight> &Scene::getPathLights() {
     return _lights;
+}
+
+std::vector<QImage> &Scene::getTextureMaps() {
+    return _texmaps;
 }
 
 bool Scene::getIntersection(const Ray& ray, IntersectionInfo* I) const{

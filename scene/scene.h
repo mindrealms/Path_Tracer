@@ -13,6 +13,8 @@
 
 #include <memory>
 
+#include <QImage>
+
 
 typedef struct  {
     int id;                                             //light ID
@@ -47,6 +49,8 @@ public:
 
     void addPathLight(const PathLight &l);
     static std::vector<PathLight>& getPathLights();
+
+    static std::vector<QImage>& getTextureMaps();
 
     bool getIntersection(const Ray& ray, IntersectionInfo* I) const;
 

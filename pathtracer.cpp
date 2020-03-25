@@ -58,10 +58,7 @@ Vector3f PathTracer::tracePixel(int x, int y, const Scene& scene, const Matrix4f
 
             for (int i = 0; i < m_samples; i++) {
 
-                //random point on (x,y) pixel
-        //        float rand_x = static_cast<float>(x) + (static_cast<float>(rand()) / RAND_MAX); //+ 1.f
-        //        float rand_y = static_cast<float>(y) + (static_cast<float>(rand()) / RAND_MAX); // + 1.f
-
+                //pseudorandom point on (x,y) pixel
                 float rand_x = static_cast<float>(x) + haltonSequence(g_x + 1.f, BASE_X);
                 float rand_y = static_cast<float>(y) + haltonSequence(g_y + 1.f, BASE_Y);
 
@@ -104,6 +101,8 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int depth)
         Vector3f normal = t->getNormal(i).normalized();
         Vector4f sample = sampleNextDir(m->getMaterial(t->getIndex()).ior, ray, i.hit, normal, &mode);
         Vector3f next_d = sample.head<3>();
+
+        //texture mapping
 //        Vector2f uvs = m->getUV(t->getIndex());
 //        tex_color = sampleTexture(uvs, mat);
 
@@ -244,25 +243,23 @@ Vector3f PathTracer::directLighting(const Scene& scene, Vector3f p, Vector3f n, 
 
     } else if (m_success) { //light probe is light source
                                                                                     //??
-//        Vector4f sample = sampleNextDir(mat->ior, Ray(Vector3f(0.f,0.f,0.f), r), Vector3f(0.f,0.f,0.f), n, &mode);
-        Vector4f sample = sampleNextDir(mat->ior, Ray(p, r.normalized()), p, n, &mode);
+        Vector4f sample = sampleNextDir(mat->ior, Ray(Vector3f(0.f,0.f,0.f), r), Vector3f(0.f,0.f,0.f), n, &mode); //old
+//        Vector4f sample = sampleNextDir(mat->ior, Ray(p, r.normalized()), p, n, &mode);
         Vector3f next_d = sample.head<3>();
 //        if (checkType(mat) == REFRACTIVE) { //no???????
 //            return Vector3f(0.f, 0.f, 0.f);
 //        }
-//        if (checkType(mat) == MIRROR) {
-            IntersectionInfo i;
-            Ray to_void(p, next_d.normalized());
-            if (!(scene.getIntersection(to_void, &i))) {
-                Ray from_void(to_void.d, -next_d.normalized());
-//                Vector3f bsdf = computeBXDF(mode, mat, &from_void, n, -r);
-                Vector3f bsdf = computeBXDF(mode, mat, &from_void, n, next_d);
+        IntersectionInfo i;
+        Ray to_void(p, next_d.normalized());
+        if (!(scene.getIntersection(to_void, &i))) {
+            Ray from_void(to_void.d, -next_d.normalized());
+            Vector3f bsdf = computeBXDF(mode, mat, &from_void, n, -r); //old
+//                Vector3f bsdf = computeBXDF(mode, mat, &from_void, n, next_d);
 
-                float o_dot = min(1.f, max(0.f, (next_d.normalized()).dot(n)));
+            float o_dot = min(1.f, max(0.f, (next_d.normalized()).dot(n)));
 
-                return Vector3f(lightProbe(next_d).array() * bsdf.array() *
-                        o_dot) /  (next_d.norm() * next_d.norm() * pdf);
-//            }
+            return Vector3f(lightProbe(next_d).array() * bsdf.array() *
+                    o_dot) /  (next_d.norm() * next_d.norm() * pdf);
         }
     }
 
@@ -274,7 +271,7 @@ Vector3f PathTracer::directLighting(const Scene& scene, Vector3f p, Vector3f n, 
 Vector4f PathTracer::sampleNextDir(tinyobj::real_t ior, Ray ray, Vector3f p, Vector3f normal, int *mode) {
 
     Vector3f w_o(0.f, 0.f, 0.f);
-    float phi, pdf = 0.f;
+    float phi, pdf;
 
     switch(*mode){
     case DIFFUSE:
@@ -390,6 +387,7 @@ void PathTracer::toneMap(QRgb *imageData, Vector3f *intensityValues) {
     }
 }
 
+//low discrepancy sampling
 float PathTracer::haltonSequence(int index, int base){
   float f = 1.f, random = 0.f;
   while (index > 0){
