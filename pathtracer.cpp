@@ -107,8 +107,8 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int depth)
 //        Vector2f uvs = m->getUV(t->getIndex());
 //        tex_color = sampleTexture(uvs, mat);
 
-        //direct lighting computation                                 //sample[3] = pdf
-        if (mode != REFRACTIVE && mode != MIRROR) {
+        //direct lighting computation
+        if (mode != REFRACTIVE && mode != MIRROR) {                       //sample[3] = pdf
             L += Vector3f(directLighting(scene, i.hit, normal, mode, ray.d, sample[3], &mat).array());
         }
 
@@ -129,7 +129,9 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int depth)
         if (static_cast<float>(rand())/RAND_MAX < pdf_rr) {
             Ray new_dir(i.hit, next_d);
             float dot = (new_dir.d).dot(normal); //already normalized
-            float denom = pdf_rr * (1/(2*M_PI)); // --------->>>>>>>>>> ??
+
+            //wait i dont get it am i not supposed to use the pdf? eg. my prob of sampling a mirror dir is 1, not 1/2pi..?
+            float denom = pdf_rr * sample[3]; //* 1.f/(2.f*M_PI);
 
             Vector3f radiance;
             if (mode == MIRROR || mode == REFRACTIVE) {
@@ -182,7 +184,7 @@ Vector3f PathTracer::computeBXDF(int mode, const tinyobj::material_t *mat, Ray *
         return Vector3f(mat->diffuse[0]/M_PI, mat->diffuse[1]/M_PI, mat->diffuse[2]/M_PI);
     }
     case GLOSSY: {
-        float k = ((mat->shininess + 2) / (2*M_PI)) * pow(getMirrorVec(ray->d, normal).dot(next_d), mat->shininess);
+        float k = ((mat->shininess + 2) / (2.f*M_PI)) * pow(getMirrorVec(ray->d, normal).dot(next_d), mat->shininess);
         return Vector3f(mat->specular[0]*k, mat->specular[1]*k, mat->specular[2]*k);
     }
     case MIRROR:
@@ -220,7 +222,7 @@ Vector3f PathTracer::directLighting(const Scene& scene, Vector3f p, Vector3f n, 
         Ray to_light(p, dir.normalized());
         if (scene.getIntersection(to_light, &i)) {
 
-            const Mesh * m = static_cast<const Mesh *>(i.object); // mesh intersected
+//            const Mesh * m = static_cast<const Mesh *>(i.object); // mesh intersected
             const Triangle *t = static_cast<const Triangle *>(i.data); // triangle intersected
 //            const tinyobj::material_t& material = m->getMaterial(t->getIndex()); // material of triangle
 
@@ -283,7 +285,7 @@ Vector4f PathTracer::sampleNextDir(tinyobj::real_t ior, Ray ray, Vector3f p, Vec
         float xi_1 = static_cast<float>(rand())/RAND_MAX, xi_2 = static_cast<float>(rand())/RAND_MAX;
 
         //defining pdf, and random phi/theta angles
-        pdf = 1.f/(2*M_PI);
+        pdf = 1.f/(2.f*M_PI);
         phi = 2.f*M_PI * xi_1;
         float theta = acos(xi_2);
 
