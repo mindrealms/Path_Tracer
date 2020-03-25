@@ -107,10 +107,8 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int depth)
 //        Vector2f uvs = m->getUV(t->getIndex());
 //        tex_color = sampleTexture(uvs, mat);
 
-        //direct lighting computation
-        if (mode != REFRACTIVE && mode != MIRROR) {                       //sample[3] = pdf
-            L += Vector3f(directLighting(scene, i.hit, normal, mode, ray.d, sample[3], &mat).array());
-        }
+        //direct lighting computation                               //sample[3] = pdf
+        L += Vector3f(directLighting(scene, i.hit, normal, mode, ray.d, sample[3], &mat).array());
 
         //bsdf computation
         Vector3f bsdf = computeBXDF(mode, &mat, &ray, normal, next_d);
@@ -124,7 +122,7 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int depth)
             pdf_rr = START_P;
             break;
         }
-
+        Vector3f radiance;
         //indirect lighting
         if (static_cast<float>(rand())/RAND_MAX < pdf_rr) {
             Ray new_dir(i.hit, next_d);
@@ -222,14 +220,14 @@ Vector3f PathTracer::directLighting(const Scene& scene, Vector3f p, Vector3f n, 
         Ray to_light(p, dir.normalized());
         if (scene.getIntersection(to_light, &i)) {
 
-//            const Mesh * m = static_cast<const Mesh *>(i.object); // mesh intersected
+            const Mesh * m = static_cast<const Mesh *>(i.object); // mesh intersected
             const Triangle *t = static_cast<const Triangle *>(i.data); // triangle intersected
-//            const tinyobj::material_t& material = m->getMaterial(t->getIndex()); // material of triangle
+            const tinyobj::material_t& material = m->getMaterial(t->getIndex()); // material of triangle
 
-//            int type = checkType(&material);
-//            if (type == REFRACTIVE || type == MIRROR) {
-//                return Vector3f(0.f, 0.f, 0.f);
-//            }
+            int type = checkType(&material);
+            if (type == REFRACTIVE || type == MIRROR) {
+                return Vector3f(0.f, 0.f, 0.f);
+            }
 
             //surface is the luminaire
             if ((i.hit[0] - tri_p[0] < EPSILON) && (i.hit[1] - tri_p[1] < EPSILON) && (i.hit[2] - tri_p[2] < EPSILON)) {

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE QtCreatorProject>
-<!-- Written by QtCreator 4.2.0, 2020-03-25T18:56:38. -->
+<!-- Written by QtCreator 4.2.0, 2020-03-25T19:01:13. -->
 <qtcreator>
  <data>
   <variable>EnvironmentId</variable>
@@ -306,7 +306,7 @@
     <value type="QString" key="ProjectExplorer.ProjectConfiguration.DisplayName"></value>
     <value type="QString" key="ProjectExplorer.ProjectConfiguration.Id">Qt4ProjectManager.Qt4RunConfiguration:/Users/marky/Desktop/CS224/class_mat/Assignments/2_path_tracing/path/Path-Stencil/path-stencil.pro</value>
     <value type="bool" key="QmakeProjectManager.QmakeRunConfiguration.UseLibrarySearchPath">true</value>
-    <value type="QString" key="Qt4ProjectManager.Qt4RunConfiguration.CommandLineArguments">/Users/marky/Desktop/CS224/class_mat/Assignments/2_path_tracing/path/Path-Stencil/example-scenes/CornellBox_Sphere_Probe.xml /Users/marky/Desktop/CS224/class_mat/Assignments/2_path_tracing/path/Path-Stencil/rendered/2020_renders/cornell_mirror_ind.png /Users/marky/Desktop/CS224/class_mat/Assignments/2_path_tracing/path/Path-Stencil/example-scenes/lightprobes/stpeters_probe.hdr 1</value>
+    <value type="QString" key="Qt4ProjectManager.Qt4RunConfiguration.CommandLineArguments">/Users/marky/Desktop/CS224/class_mat/Assignments/2_path_tracing/path/Path-Stencil/example-scenes/CornellBox_Sphere.xml /Users/marky/Desktop/CS224/class_mat/Assignments/2_path_tracing/path/Path-Stencil/rendered/2020_renders/cornell_sphere_dir.png 0 1</value>
     <value type="QString" key="Qt4ProjectManager.Qt4RunConfiguration.ProFile">path-stencil.pro</value>
     <value type="bool" key="Qt4ProjectManager.Qt4RunConfiguration.UseDyldImageSuffix">false</value>
     <value type="QString" key="Qt4ProjectManager.Qt4RunConfiguration.UserWorkingDirectory"></value>
