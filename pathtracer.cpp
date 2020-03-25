@@ -107,8 +107,10 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int depth)
 //        Vector2f uvs = m->getUV(t->getIndex());
 //        tex_color = sampleTexture(uvs, mat);
 
-        //direct lighting computation                               //sample[3] = pdf
-        L += Vector3f(directLighting(scene, i.hit, normal, mode, ray.d, sample[3], &mat).array());
+        //direct lighting computation                                 //sample[3] = pdf
+        if (mode != MIRROR && mode != REFRACTIVE) {
+            L += Vector3f(directLighting(scene, i.hit, normal, mode, ray.d, sample[3], &mat).array());
+        }
 
         //bsdf computation
         Vector3f bsdf = computeBXDF(mode, &mat, &ray, normal, next_d);
@@ -122,14 +124,12 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int depth)
             pdf_rr = START_P;
             break;
         }
-        Vector3f radiance;
+
         //indirect lighting
         if (static_cast<float>(rand())/RAND_MAX < pdf_rr) {
             Ray new_dir(i.hit, next_d);
             float dot = (new_dir.d).dot(normal); //already normalized
-
-            //wait i dont get it am i not supposed to use the pdf? eg. my prob of sampling a mirror dir is 1, not 1/2pi..?
-            float denom = pdf_rr * sample[3]; //* 1.f/(2.f*M_PI);
+            float denom = pdf_rr * sample[3]; // --------->>>>>>>>>> (1/(2*M_PI)) ?? sample[3]
 
             Vector3f radiance;
             if (mode == MIRROR || mode == REFRACTIVE) {
@@ -182,7 +182,7 @@ Vector3f PathTracer::computeBXDF(int mode, const tinyobj::material_t *mat, Ray *
         return Vector3f(mat->diffuse[0]/M_PI, mat->diffuse[1]/M_PI, mat->diffuse[2]/M_PI);
     }
     case GLOSSY: {
-        float k = ((mat->shininess + 2) / (2.f*M_PI)) * pow(getMirrorVec(ray->d, normal).dot(next_d), mat->shininess);
+        float k = ((mat->shininess + 2) / (2*M_PI)) * pow(getMirrorVec(ray->d, normal).dot(next_d), mat->shininess);
         return Vector3f(mat->specular[0]*k, mat->specular[1]*k, mat->specular[2]*k);
     }
     case MIRROR:
@@ -283,7 +283,7 @@ Vector4f PathTracer::sampleNextDir(tinyobj::real_t ior, Ray ray, Vector3f p, Vec
         float xi_1 = static_cast<float>(rand())/RAND_MAX, xi_2 = static_cast<float>(rand())/RAND_MAX;
 
         //defining pdf, and random phi/theta angles
-        pdf = 1.f/(2.f*M_PI);
+        pdf = 1.f/(2*M_PI);
         phi = 2.f*M_PI * xi_1;
         float theta = acos(xi_2);
 
