@@ -15,6 +15,8 @@
 
 #include <QImage>
 
+#include <unordered_map>
+
 
 typedef struct  {
     int id;                                             //light ID
@@ -50,7 +52,7 @@ public:
     void addPathLight(const PathLight &l);
     static std::vector<PathLight>& getPathLights();
 
-    static std::vector<QImage>& getTextureMaps();
+    static std::unordered_map<std::string, QImage>& getTextureMaps();
 
     bool getIntersection(const Ray& ray, IntersectionInfo* I) const;
 

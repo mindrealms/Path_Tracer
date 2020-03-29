@@ -36,7 +36,9 @@ private:
     int m_width, m_height, m_samples;
     QString m_probe;
     HDRLoaderResult m_result;
-    bool m_success;
+    bool m_success, m_usetex;
+
+    std::unordered_map<std::string, QImage> m_texmaps;
 
     Vector3f sampleTexture(Vector2f uvs, const tinyobj::material_t& mat);
 
@@ -59,6 +61,10 @@ private:
     Vector3f tracePixel(int x, int y, const Scene &scene, const Eigen::Matrix4f &invViewMatrix);
 
     Vector3f traceRay(const Ray& r, const Scene &scene, int depth);
+
+    Vector3f barycentricCoords(Vector3f a, Vector3f b, Vector3f c, Vector3f p);
+
+    QRgb getUVcolor(const Mesh *m, int index, QImage *img);
 
     float haltonSequence(int n, int base);
 

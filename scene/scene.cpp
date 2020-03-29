@@ -18,7 +18,7 @@
 using namespace Eigen;
 
 static std::vector<PathLight> _lights = std::vector<PathLight>();
-static std::vector<QImage> _texmaps = std::vector<QImage>();
+static std::unordered_map<std::string, QImage> _texmaps = std::unordered_map<std::string, QImage>();
 
 Scene::Scene()
 {
@@ -163,14 +163,16 @@ Mesh *Scene::loadMesh(std::string filePath, const Affine3f &transform, const std
     std::vector<int> materialIds;
     std::vector<Vector3i> faces;
 
+    std::vector<std::string> texmapIds;
+
     //TODO populate vectors and use tranform
-    for(size_t s = 0; s < shapes.size(); s++) { //iterate through all shapes
+    for (size_t s = 0; s < shapes.size(); s++) { //iterate through all shapes
         size_t index_offset = 0;
-        for(size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) { //iterate through shape mesh's face vertices
+        for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) { //iterate through shape mesh's face vertices
             unsigned int fv = shapes[s].mesh.num_face_vertices[f];
 
             Vector3i face;
-            for(size_t v = 0; v < fv; v++) { //iterate through curr face's vertices
+            for (size_t v = 0; v < fv; v++) { //iterate through curr face's vertices
                 tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
                 tinyobj::real_t vx = attrib.vertices[3*idx.vertex_index+0];
                 tinyobj::real_t vy = attrib.vertices[3*idx.vertex_index+1];
@@ -181,7 +183,7 @@ Mesh *Scene::loadMesh(std::string filePath, const Affine3f &transform, const std
                 tinyobj::real_t tx;
                 tinyobj::real_t ty;
 
-                if(idx.normal_index != -1) {
+                if (idx.normal_index != -1) {
                     nx = attrib.normals[3*idx.normal_index+0];
                     ny = attrib.normals[3*idx.normal_index+1];
                     nz = attrib.normals[3*idx.normal_index+2];
@@ -190,7 +192,7 @@ Mesh *Scene::loadMesh(std::string filePath, const Affine3f &transform, const std
                     ny = 0;
                     nz = 0;
                 }
-                if(idx.texcoord_index != -1) {
+                if (idx.texcoord_index != -1) {
                     tx = attrib.texcoords[2*idx.texcoord_index+0];
                     ty = attrib.texcoords[2*idx.texcoord_index+1];
                 } else { //if not defined in file
@@ -205,8 +207,6 @@ Mesh *Scene::loadMesh(std::string filePath, const Affine3f &transform, const std
                 face[v] = vertices.size();
                 vertices.push_back(transform * Vector3f(vx, vy, vz));
                 normals.push_back((transform.linear() * Vector3f(nx, ny, nz)).normalized());
-                //vertices.push_back(Vector3f(vx, vy, vz));
-                //normals.push_back(Vector3f(nx, ny, nz).normalized());
                 uvs.push_back(Vector2f(tx, ty));
                 colors.push_back(Vector3f(red, green, blue));
             }
@@ -215,6 +215,14 @@ Mesh *Scene::loadMesh(std::string filePath, const Affine3f &transform, const std
 
             faces.push_back(face);
             materialIds.push_back(mat_id);
+
+            //loading texture maps in _texmaps set
+            std::string img_name = materials[mat_id].diffuse_texname;
+            if (_texmaps.find(img_name) == _texmaps.end() && img_name != "") {
+//                std::cout << "name = " << img_name << std::endl;
+                QImage image = QImage(materials[mat_id].diffuse_texname.data());
+                _texmaps[img_name] = image;
+            }
 
             //add emissive triangles to _lights vector
             Vector3f emitted = Vector3f(materials[mat_id].emission[0],
@@ -251,6 +259,7 @@ Mesh *Scene::loadMesh(std::string filePath, const Affine3f &transform, const std
             index_offset += fv;
         }
     }
+
     std::cout << "Loaded " << faces.size() << " faces" << std::endl;
 
     Vector3f avg(0.f, 0.f, 0.f);
@@ -330,7 +339,7 @@ std::vector<PathLight> &Scene::getPathLights() {
     return _lights;
 }
 
-std::vector<QImage> &Scene::getTextureMaps() {
+std::unordered_map<std::string, QImage> &Scene::getTextureMaps() {
     return _texmaps;
 }
 

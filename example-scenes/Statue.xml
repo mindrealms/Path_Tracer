@@ -9,7 +9,7 @@
         <transblock>
             <rotate x="1" y="0" z="0" angle="90"/>
             <translate x="11442" y="13020" z="12745"/>
-            <object type="primitive" name="mesh" filename="models/Erato/erato-1-diffuse.obj">
+            <object type="primitive" name="mesh" filename="models/Statue/LibertStatue.obj">
             </object>
         </transblock>
     </object>
