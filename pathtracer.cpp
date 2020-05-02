@@ -75,9 +75,6 @@ Vector3f PathTracer::tracePixel(int x, int y, const Scene& scene, const Matrix4f
                     Vector3f focal_point = m_focal_l * d;
 
                     //random point on "disc" (ie. shifting the eye location)
-//                    float r_x = (2.f * m_aperture * static_cast<float>(rand()) / static_cast<float>(RAND_MAX)) - m_aperture;
-//                    float r_y = (2.f * m_aperture * static_cast<float>(rand()) / static_cast<float>(RAND_MAX)) - m_aperture;
-
                     float a = static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * 2.f * M_PI;
                     float r = m_aperture * sqrt(static_cast<float>(rand()) / static_cast<float>(RAND_MAX));
 
