@@ -19,11 +19,11 @@
     const std::string diffuseTex = mat.diffuse_texname; //Diffuse texture name
 */
 
-PathTracer::PathTracer(int width, int height, int samples, QString lightprobe)
+PathTracer::PathTracer(int width, int height, int samples, QString lightprobe, bool dof_mode, float focal_l, float aperture)
     : m_width(width), m_height(height), m_samples(samples), m_probe(lightprobe),
-      m_success(HDRLoader::load(m_probe.toStdString().c_str(), m_result)), m_usetex(false)
+      m_success(HDRLoader::load(m_probe.toStdString().c_str(), m_result)),
+      m_usetex(false), m_usedof(dof_mode), m_focal_l(focal_l), m_aperture(aperture)
 {
-
 }
 
 void PathTracer::traceScene(QRgb *imageData, const Scene& scene)
@@ -69,6 +69,18 @@ Vector3f PathTracer::tracePixel(int x, int y, const Scene& scene, const Matrix4f
 
                 Vector3f d((2.f * (rand_x) / m_width) - 1.f, 1.f - (2.f * (rand_y) / m_height), -1.f);
                 d.normalize();
+
+                if (m_usedof) {
+
+                    Vector3f focal_point = m_focal_l * d;
+
+                    //random point on "disc" (ie. shifting the eye location)
+                    float r_x = (2.f * m_aperture * static_cast<float>(rand()) / static_cast<float>(RAND_MAX)) - m_aperture;
+                    float r_y = (2.f * m_aperture * static_cast<float>(rand()) / static_cast<float>(RAND_MAX)) - m_aperture;
+
+                    p = Vector3f(r_x, r_y, 0);
+                    d = focal_point - p;
+                }
 
                 Ray r(p, d);
                 r = r.transform(invViewMatrix);

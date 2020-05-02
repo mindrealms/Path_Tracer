@@ -22,7 +22,7 @@ int main(int argc, char *argv[])
     parser.process(a);
 
     const QStringList args = parser.positionalArguments();
-    if(args.size() != 4) {
+    if(args.size() != 7) {
         std::cerr << "Error: Wrong number of arguments" << std::endl;
         a.exit(1);
         return 1;
@@ -31,11 +31,36 @@ int main(int argc, char *argv[])
     QString output = args[1];
     QString lightprobe = args[2]; //light probe file
     int samples = args[3].toInt();
+    QString dof = args[4];
+    float focal_l = args[5].toFloat() + 1.f; //distance at which objects are in focus (+1 to account for image plane location)
+    float aperture = args[6].toFloat(); //radius of disc
 
     if (lightprobe[0].isDigit() == 0) {
-        std::cout << "no probe" << std::endl;
+        std::cout << "No light probe to be used" << std::endl;
     }
 
+    bool dof_mode;
+    if (dof == "on") {
+        dof_mode = true;
+    } else if (dof == "off") {
+        dof_mode = false;
+    } else {
+        std::cerr << "Error: incorrect DOF mode argument" << std::endl;
+        a.exit(1);
+        return 1;
+    }
+
+    if (focal_l < 1.f) {
+        std::cerr << "Error: invalid focal length value" << std::endl;
+        a.exit(1);
+        return 1;
+    }
+
+    if (aperture < 0) {
+        std::cerr << "Error: invalid aperture value" << std::endl;
+        a.exit(1);
+        return 1;
+    }
 
     QImage image(IMAGE_WIDTH, IMAGE_HEIGHT, QImage::Format_RGB32);
 
@@ -46,7 +71,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    PathTracer tracer(IMAGE_WIDTH, IMAGE_HEIGHT, samples, lightprobe);
+    PathTracer tracer(IMAGE_WIDTH, IMAGE_HEIGHT, samples, lightprobe, dof_mode, focal_l, aperture);
 
     QRgb *data = reinterpret_cast<QRgb *>(image.bits());
 

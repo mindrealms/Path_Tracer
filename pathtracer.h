@@ -28,7 +28,7 @@ enum MODE {
 class PathTracer
 {
 public:
-    PathTracer(int width, int height, int samples, QString lightprobe);
+    PathTracer(int width, int height, int samples, QString lightprobe, bool dof_mode, float focal_l, float aperture);
 
     void traceScene(QRgb *imageData, const Scene &scene);
 
@@ -36,7 +36,8 @@ private:
     int m_width, m_height, m_samples;
     QString m_probe;
     HDRLoaderResult m_result;
-    bool m_success, m_usetex;
+    bool m_success, m_usetex, m_usedof;
+    float m_focal_l, m_aperture;
 
     std::unordered_map<std::string, QImage> m_texmaps;
 
