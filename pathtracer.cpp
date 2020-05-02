@@ -75,8 +75,15 @@ Vector3f PathTracer::tracePixel(int x, int y, const Scene& scene, const Matrix4f
                     Vector3f focal_point = m_focal_l * d;
 
                     //random point on "disc" (ie. shifting the eye location)
-                    float r_x = (2.f * m_aperture * static_cast<float>(rand()) / static_cast<float>(RAND_MAX)) - m_aperture;
-                    float r_y = (2.f * m_aperture * static_cast<float>(rand()) / static_cast<float>(RAND_MAX)) - m_aperture;
+//                    float r_x = (2.f * m_aperture * static_cast<float>(rand()) / static_cast<float>(RAND_MAX)) - m_aperture;
+//                    float r_y = (2.f * m_aperture * static_cast<float>(rand()) / static_cast<float>(RAND_MAX)) - m_aperture;
+
+                    float a = static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * 2.f * M_PI;
+                    float r = m_aperture * sqrt(static_cast<float>(rand()) / static_cast<float>(RAND_MAX));
+
+                    // If you need it in Cartesian coordinates
+                    float r_x = r * cos(a);
+                    float r_y = r * sin(a);
 
                     p = Vector3f(r_x, r_y, 0);
                     d = focal_point - p;
@@ -392,6 +399,7 @@ Vector3f PathTracer::getRefractVec(Ray ray, Vector3f p, Vector3f &normal, tinyob
 
 int PathTracer::checkType(const tinyobj::material_t *mat) {
     switch(mat->illum) {
+    case 1:
     case 2: {
         float diff = Vector3f(mat->diffuse[0], mat->diffuse[1], mat->diffuse[2]).norm();
         float spec = Vector3f(mat->specular[0], mat->specular[1], mat->specular[2]).norm();

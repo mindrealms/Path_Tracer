@@ -32,7 +32,7 @@ int main(int argc, char *argv[])
     QString lightprobe = args[2]; //light probe file
     int samples = args[3].toInt();
     QString dof = args[4];
-    float focal_l = args[5].toFloat() + 1.f; //distance at which objects are in focus (+1 to account for image plane location)
+    float focal_l = args[5].toFloat(); //distance at which objects are in focus (+1 to account for image plane location)
     float aperture = args[6].toFloat(); //radius of disc
 
     if (lightprobe[0].isDigit() == 0) {
@@ -50,7 +50,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    if (focal_l < 1.f) {
+    if (focal_l < 0) {
         std::cerr << "Error: invalid focal length value" << std::endl;
         a.exit(1);
         return 1;
@@ -71,7 +71,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    PathTracer tracer(IMAGE_WIDTH, IMAGE_HEIGHT, samples, lightprobe, dof_mode, focal_l, aperture);
+    PathTracer tracer(IMAGE_WIDTH, IMAGE_HEIGHT, samples, lightprobe, dof_mode, focal_l + 1.f, aperture);
 
     QRgb *data = reinterpret_cast<QRgb *>(image.bits());
 
